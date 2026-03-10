@@ -343,6 +343,54 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
 .hdr-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .hdr-btn.red:hover{background:rgba(255,23,68,.1);color:var(--red)}
 
+/* ═══ PANIC BUTTON ═══ */
+.panic-btn{
+  display:flex;align-items:center;gap:5px;
+  padding:5px 11px;border-radius:9px;border:1.5px solid rgba(255,23,68,.35);
+  background:rgba(255,23,68,.08);cursor:pointer;
+  font-family:var(--font);font-size:.65rem;font-weight:700;color:var(--red);
+  letter-spacing:.3px;flex-shrink:0;
+  transition:all .18s cubic-bezier(.34,1.56,.64,1);
+  position:relative;overflow:hidden;
+}
+.panic-btn::before{content:'';position:absolute;inset:0;background:rgba(255,23,68,0);transition:background .15s}
+.panic-btn:hover{border-color:rgba(255,23,68,.7);background:rgba(255,23,68,.15);transform:scale(1.04);box-shadow:0 0 12px rgba(255,23,68,.3)}
+.panic-btn:active{transform:scale(.95)}
+.panic-btn svg{width:12px;height:12px;fill:currentColor;flex-shrink:0}
+/* Panic confirm overlay */
+#panic-overlay{
+  position:fixed;inset:0;z-index:9998;
+  background:rgba(5,1,2,.96);display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;backdrop-filter:blur(14px);
+}
+#panic-overlay.open{display:flex}
+.panic-icon{font-size:3rem;animation:panic-shake .4s cubic-bezier(.36,.07,.19,.97)}
+@keyframes panic-shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(8deg)}60%{transform:rotate(-5deg)}80%{transform:rotate(5deg)}}
+.panic-title{font-family:var(--display);font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-1px}
+.panic-sub{font-size:.8rem;color:rgba(255,255,255,.5);text-align:center;max-width:270px;line-height:1.6}
+.panic-timer{
+  font-family:var(--mono);font-size:3.5rem;font-weight:600;
+  color:var(--red);text-shadow:0 0 30px rgba(255,23,68,.6);
+  letter-spacing:2px;
+  animation:timer-pulse .5s ease-in-out infinite alternate;
+}
+@keyframes timer-pulse{from{opacity:.7;transform:scale(.97)}to{opacity:1;transform:scale(1.03)}}
+.panic-bar{width:260px;height:4px;background:rgba(255,23,68,.2);border-radius:2px;overflow:hidden}
+.panic-bar-fill{height:100%;background:var(--red);border-radius:2px;width:100%;transition:width .1s linear;box-shadow:0 0 8px rgba(255,23,68,.6)}
+.panic-cancel{
+  padding:9px 28px;border-radius:10px;border:1.5px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.07);color:rgba(255,255,255,.7);
+  font-family:var(--font);font-size:.82rem;font-weight:600;cursor:pointer;
+  transition:all .18s;
+}
+.panic-cancel:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4)}
+.panic-hint{font-size:.62rem;color:rgba(255,255,255,.25);letter-spacing:.5px;text-align:center}
+/* Sound toggle in lhdr */
+.snd-btn{width:28px;height:28px;border-radius:7px;background:none;border:1px solid var(--bdr);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx3);transition:all .15s;flex-shrink:0;font-size:.8rem}
+.snd-btn:hover{background:var(--gl2);color:var(--tx);border-color:var(--bdr2)}
+.snd-btn.muted{opacity:.45}
+
 /* Members panel */
 .mbr-panel{display:none;position:absolute;right:0;top:0;bottom:0;width:220px;background:var(--bg1);border-left:1px solid var(--bdr);flex-direction:column;z-index:19;box-shadow:-4px 0 30px rgba(0,0,0,.5)}
 .mbr-panel.open{display:flex}
@@ -451,28 +499,130 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
 .msg-wrap:focus-within{border-color:var(--g2);box-shadow:0 0 0 2px rgba(0,230,118,.07)}
 .msg-wrap textarea{flex:1;background:none;border:none;color:var(--tx);font-family:var(--font);font-size:.84rem;outline:none;resize:none;max-height:100px;line-height:1.45}
 .msg-wrap textarea::placeholder{color:var(--tx4)}
-.send-btn{
-  width:38px;height:38px;border-radius:11px;
-  background:linear-gradient(135deg,var(--g3),var(--g2));
-  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-  box-shadow:0 2px 10px rgba(0,200,83,.3),inset 0 1px 0 rgba(255,255,255,.2);
-  transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s ease;
-}
-.send-btn:hover{transform:scale(1.1);box-shadow:0 4px 18px rgba(0,200,83,.5)}
-.send-btn:active{transform:scale(.92)}
-.send-btn svg{width:14px;height:14px;fill:#fff}
-.mic-btn{
-  width:38px;height:38px;border-radius:11px;
-  background:var(--bg3);border:1px solid var(--bdr);cursor:pointer;
+/* ── SEND / MIC MORPH ── */
+.btn-slot{position:relative;width:38px;height:38px;flex-shrink:0}
+.send-btn,.mic-btn{
+  position:absolute;inset:0;width:100%;height:100%;
+  border-radius:11px;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;color:var(--tx2);
-  transition:all .18s;
 }
+.send-btn{
+  background:linear-gradient(135deg,var(--g3),var(--g2));
+  box-shadow:0 2px 10px rgba(0,200,83,.3),inset 0 1px 0 rgba(255,255,255,.2);
+  opacity:0;pointer-events:none;
+  transform:scale(.6) rotate(-20deg);
+  transition:opacity .2s ease,transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .18s ease;
+}
+.send-btn.visible{opacity:1;pointer-events:auto;transform:scale(1) rotate(0deg)}
+.send-btn:hover{box-shadow:0 4px 18px rgba(0,200,83,.55)}
+.send-btn.launch{animation:btn-launch .38s cubic-bezier(.22,.68,0,1.8) forwards}
+@keyframes btn-launch{
+  0%  {transform:scale(1) rotate(0deg)}
+  30% {transform:scale(.82) rotate(-8deg)}
+  55% {transform:scale(1.28) rotate(6deg);box-shadow:0 6px 28px rgba(0,200,83,.7)}
+  75% {transform:scale(.94) rotate(-2deg)}
+  100%{transform:scale(1) rotate(0deg)}
+}
+.send-btn svg{width:14px;height:14px;fill:#fff;transition:transform .15s ease}
+.send-btn:not(.launch):hover svg{transform:translateX(2px) translateY(-2px)}
+.mic-btn{
+  background:var(--bg3);border:1px solid var(--bdr);
+  color:var(--tx2);
+  opacity:1;pointer-events:auto;
+  transform:scale(1);
+  transition:opacity .2s ease,transform .25s cubic-bezier(.34,1.56,.64,1),background .15s,border-color .15s;
+}
+.mic-btn.hidden{opacity:0;pointer-events:none;transform:scale(.6) rotate(20deg)}
 .mic-btn:hover{background:var(--gl2);border-color:var(--bdr2);color:var(--tx)}
 .mic-btn.rec{background:var(--red);border-color:var(--red);color:#fff;animation:mic-pulse 1s infinite}
-@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,23,68,.5)}50%{box-shadow:0 0 0 9px rgba(255,23,68,0)}}
 .mic-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+/* Ripple particle on launch */
+.send-ripple{
+  position:fixed;width:38px;height:38px;border-radius:11px;
+  background:rgba(0,200,83,.45);pointer-events:none;z-index:9990;
+  animation:send-ripple-burst .5s ease-out forwards;
+}
+@keyframes send-ripple-burst{
+  0%  {transform:scale(1);opacity:.8}
+  100%{transform:scale(3.5);opacity:0}
+}
+
+/* ── DRAG-TO-REPLY ── */
+.mrow{touch-action:pan-y}
+.mrow.dragging .bbl{transition:transform .05s linear}
+.reply-arrow{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;border-radius:50%;
+  background:var(--gl3);border:1px solid var(--bdr2);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .12s ease;
+  color:var(--g2);font-size:.78rem;flex-shrink:0;
+}
+.mrow.out .reply-arrow{right:calc(100% + 6px)}
+.mrow.in  .reply-arrow{left:calc(100% + 6px)}
+.mrow.reply-ready .reply-arrow{opacity:1}
+.reply-bar{
+  display:none;background:var(--bg3);border-left:3px solid var(--g2);
+  border-top:1px solid var(--bdr);
+  padding:6px 12px;font-size:.72rem;color:var(--tx2);
+  flex-direction:row;align-items:center;gap:8px;flex-shrink:0;
+}
+.reply-bar.show{display:flex}
+.reply-bar-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reply-bar-name{color:var(--g);font-weight:700;margin-right:4px}
+.reply-dismiss{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:1rem;padding:0 2px;line-height:1;transition:color .15s}
+.reply-dismiss:hover{color:var(--red)}
+.reply-quote{
+  background:rgba(0,0,0,.25);border-left:2.5px solid var(--g2);
+  border-radius:4px 8px 8px 4px;padding:4px 8px;
+  margin-bottom:5px;font-size:.68rem;color:rgba(255,255,255,.55);
+  line-height:1.4;cursor:pointer;
+}
+.mrow.in .reply-quote{background:rgba(0,0,0,.12);color:var(--tx3)}
+.reply-quote-name{color:var(--g2);font-weight:700;font-size:.63rem;margin-bottom:1px}
+@keyframes quote-highlight{0%,100%{background:transparent}30%,70%{background:rgba(0,230,118,.12);border-radius:12px}}
+.msg-highlight{animation:quote-highlight .9s ease}
+
+/* ── AMBIENCE PLAYER ── */
+.amb-btn{
+  width:28px;height:28px;border-radius:7px;background:none;
+  border:1px solid var(--bdr);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--tx3);transition:all .18s;flex-shrink:0;font-size:.82rem;
+}
+.amb-btn:hover{background:var(--gl2);color:var(--tx);border-color:var(--bdr2)}
+.amb-btn.playing{color:var(--g);border-color:var(--bdr2);background:var(--gl1);animation:amb-breathe 2.5s ease-in-out infinite}
+@keyframes amb-breathe{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,0)}50%{box-shadow:0 0 0 5px rgba(0,230,118,.12)}}
+.amb-panel{
+  position:absolute;bottom:62px;right:11px;
+  background:var(--bg2);border:1px solid var(--bdr2);border-radius:14px;
+  padding:14px;width:228px;z-index:35;
+  box-shadow:var(--shadow2);
+  display:none;animation:picker-pop .15s ease;
+}
+.amb-panel.open{display:block}
+.amb-header{font-size:.6rem;font-weight:700;color:var(--g2);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.amb-tracks{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.amb-track{
+  display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;
+  cursor:pointer;transition:background .14s;border:1px solid transparent;
+}
+.amb-track:hover{background:var(--gl1)}
+.amb-track.active{background:var(--gl2);border-color:var(--bdr2)}
+.amb-track-ico{font-size:1.05rem;flex-shrink:0}
+.amb-track-info{flex:1;min-width:0}
+.amb-track-name{font-size:.74rem;font-weight:600;color:var(--tx)}
+.amb-track-desc{font-size:.57rem;color:var(--tx3)}
+.amb-track-ind{width:6px;height:6px;border-radius:50%;background:var(--g);flex-shrink:0;opacity:0;animation:sb-pulse 2s infinite}
+.amb-track.active .amb-track-ind{opacity:1}
+.amb-vol-row{display:flex;align-items:center;gap:8px}
+.amb-vol-label{font-size:.6rem;color:var(--tx3);width:18px;text-align:center}
+.amb-vol-slider{
+  flex:1;-webkit-appearance:none;height:3px;border-radius:2px;outline:none;cursor:pointer;
+  background:linear-gradient(to right,var(--g2) 50%,var(--bg4) 50%);
+}
+.amb-vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--g);box-shadow:0 0 6px rgba(0,230,118,.4);cursor:pointer}
+.amb-vol-slider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--g);border:none;cursor:pointer}
 
 /* Attach menu */
 .att-menu{
@@ -750,6 +900,7 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
       <div class="my-av" id="my-av" onclick="openProf()">🦊</div>
       <div class="lhdr-title">NullChat</div>
       <div class="conn-badge cb-off" id="conn-badge"><div class="cb-dot"></div>Offline</div>
+      <button class="snd-btn" id="snd-btn" onclick="toggleSound()" title="Toggle sounds">🔊</button>
       <button class="new-room-btn" onclick="newRoom()" title="New Room">
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
       </button>
@@ -778,6 +929,9 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
         </div>
         <button class="hdr-btn" onclick="showQr()" title="QR Invite"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h1v1M17 14h3M14 17v3M17 17h1M19 17v1M17 19h3"/></svg></button>
         <button class="hdr-btn" onclick="toggleMbrs()" title="Members"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></button>
+        <button class="panic-btn" onclick="triggerPanic()" title="Panic — wipe everything">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>PANIC
+        </button>
         <button class="hdr-btn red" onclick="leaveRoom()" title="Leave"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
       </div>
 
@@ -808,13 +962,33 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
         <div class="att-item" onclick="startVoice()"><div class="att-ico" style="background:rgba(255,23,68,.12)">🎙️</div><div class="att-lbl">Voice</div></div>
       </div>
 
+      <!-- Reply quote bar (shown above input when replying) -->
+      <div class="reply-bar" id="reply-bar">
+        <div style="font-size:.8rem">↩️</div>
+        <div class="reply-bar-text"><span class="reply-bar-name" id="reply-bar-name"></span><span id="reply-bar-txt"></span></div>
+        <button class="reply-dismiss" onclick="clearReply()">✕</button>
+      </div>
+
       <!-- Input bar -->
       <div class="inp-bar">
         <button class="ib-btn" onclick="toggleEkb()"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 13s.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
         <button class="ib-btn" id="att-btn" onclick="toggleAtt()"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
-        <div class="msg-wrap"><textarea id="msg-inp" rows="1" placeholder="Message..." onkeydown="hk(event)" oninput="ar(this);sendTyp()"></textarea></div>
-        <button class="mic-btn" id="mic-btn" onclick="toggleVoice()"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
-        <button class="send-btn" id="send-btn" onclick="sendMsg()" style="display:none"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22 11 13 2 9l20-7z"/></svg></button>
+        <div class="msg-wrap"><textarea id="msg-inp" rows="1" placeholder="Message..." onkeydown="hk(event)" oninput="ar(this);sendTyp();updSendBtn()"></textarea></div>
+        <div class="btn-slot">
+          <button class="mic-btn" id="mic-btn" onclick="toggleVoice()"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+          <button class="send-btn" id="send-btn" onclick="launchSend()"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22 11 13 2 9l20-7z"/></svg></button>
+        </div>
+        <button class="amb-btn" id="amb-btn" onclick="toggleAmbPanel()" title="Ambience">🎵</button>
+        <!-- Ambience panel -->
+        <div class="amb-panel" id="amb-panel">
+          <div class="amb-header">🎧 Ambience</div>
+          <div class="amb-tracks" id="amb-tracks"></div>
+          <div class="amb-vol-row">
+            <span class="amb-vol-label">🔈</span>
+            <input type="range" class="amb-vol-slider" id="amb-vol" min="0" max="100" value="50" oninput="setAmbVol(this.value)">
+            <span class="amb-vol-label">🔊</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -884,6 +1058,17 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
       <button class="mbtn mbtn-danger" onclick="confirmKick()">Remove</button>
     </div>
   </div>
+</div>
+
+<!-- PANIC OVERLAY -->
+<div id="panic-overlay">
+  <div class="panic-icon">🛡️</div>
+  <div class="panic-title">Panic Mode</div>
+  <div class="panic-sub">All messages and keys will be permanently destroyed. You will leave the room instantly.</div>
+  <div class="panic-timer" id="panic-timer">3</div>
+  <div class="panic-bar"><div class="panic-bar-fill" id="panic-bar-fill"></div></div>
+  <button class="panic-cancel" onclick="cancelPanic()">Cancel — Keep Chat</button>
+  <div class="panic-hint">HOLD POWER BUTTON OR PRESS ESC TO CANCEL</div>
 </div>
 
 <input type="file" id="fi-img" accept="image/*">
@@ -1156,11 +1341,7 @@ setupSS();
   document.getElementById('fi-' + t).addEventListener('change', e => onFile(e.target.files[0], t));
 });
 document.getElementById('fi-bg').addEventListener('change', e => addCustomBg(e.target.files[0]));
-document.getElementById('msg-inp').addEventListener('input', () => {
-  const has = document.getElementById('msg-inp').value.trim().length > 0;
-  document.getElementById('send-btn').style.display = has ? 'flex' : 'none';
-  document.getElementById('mic-btn').style.display = has ? 'none' : 'flex';
-});
+document.getElementById('msg-inp').addEventListener('input', updSendBtn);
 document.addEventListener('click', e => {
   if (!e.target.closest('#att-btn') && !e.target.closest('.att-menu'))
     document.getElementById('att-menu').classList.remove('open');
@@ -1712,27 +1893,84 @@ function confirmKick() {
 }
 
 // ────────────────────────────────────────────────────────────
-//  MESSAGING  —  fixed dispatch
+//  SEND BUTTON STATE
+// ────────────────────────────────────────────────────────────
+function updSendBtn() {
+  const has = document.getElementById('msg-inp').value.trim().length > 0;
+  document.getElementById('send-btn').classList.toggle('visible', has);
+  document.getElementById('mic-btn').classList.toggle('hidden', has);
+}
+
+function launchSend() {
+  const btn = document.getElementById('send-btn');
+  // Fire ripple from button position
+  const rect = btn.getBoundingClientRect();
+  const rip = document.createElement('div');
+  rip.className = 'send-ripple';
+  rip.style.left = rect.left + 'px';
+  rip.style.top = rect.top + 'px';
+  document.body.appendChild(rip);
+  rip.addEventListener('animationend', () => rip.remove());
+  // Spring launch animation
+  btn.classList.remove('launch');
+  void btn.offsetWidth; // reflow to restart
+  btn.classList.add('launch');
+  btn.addEventListener('animationend', () => btn.classList.remove('launch'), { once: true });
+  sendMsg();
+}
+
+// ────────────────────────────────────────────────────────────
+//  REPLY STATE
+// ────────────────────────────────────────────────────────────
+let replyTo = null; // { msgId, name, text }
+
+function setReply(msgId, senderName, previewText) {
+  replyTo = { msgId, name: senderName, text: previewText };
+  document.getElementById('reply-bar-name').textContent = senderName + ': ';
+  document.getElementById('reply-bar-txt').textContent = previewText.slice(0, 80) + (previewText.length > 80 ? '…' : '');
+  document.getElementById('reply-bar').classList.add('show');
+  document.getElementById('msg-inp').focus();
+  // Haptic hint on mobile
+  try { navigator.vibrate?.(18); } catch {}
+}
+
+function clearReply() {
+  replyTo = null;
+  document.getElementById('reply-bar').classList.remove('show');
+}
+
+function jumpToMsg(msgId) {
+  const el = document.getElementById('m-' + msgId);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('msg-highlight');
+  el.addEventListener('animationend', () => el.classList.remove('msg-highlight'), { once: true });
+}
+
+// ────────────────────────────────────────────────────────────
+//  MESSAGING
 // ────────────────────────────────────────────────────────────
 async function sendMsg() {
   const txt = document.getElementById('msg-inp').value.trim(); if (!txt) return;
   document.getElementById('msg-inp').value = '';
   document.getElementById('msg-inp').style.height = 'auto';
-  document.getElementById('send-btn').style.display = 'none';
-  document.getElementById('mic-btn').style.display = 'flex';
+  updSendBtn();
   const now = new Date();
   const inner = {
     msgId: 'msg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     from: S.myId, sn: S.name, sa: S.avatar,
-    msgType: 'text', text: txt, time: ft(now), date: fd(now)
+    msgType: 'text', text: txt, time: ft(now), date: fd(now),
+    replyTo: replyTo ? { ...replyTo } : null
   };
+  clearReply();
   await dispatch(inner);
   addMsg({ dir: 'out', senderName: S.name, ...inner });
+  SFX.send();
   addRecent(txt);
   const r = S.rooms.find(x => x.code === S.room);
   if (r) { r.lastMsg = txt; r.lastTime = ft(now); } renderCL();
 }
-async function sendMedia(inner) { await dispatch(inner); addMsg({ dir: 'out', senderName: S.name, ...inner }); }
+async function sendMedia(inner) { await dispatch(inner); addMsg({ dir: 'out', senderName: S.name, ...inner }); SFX.send(); }
 
 // KEY FIX: dispatch sends over ALL open P2P connections with peer-specific encryption.
 // Falls back to Ably relay (with room-key encryption) for any peer without P2P yet.
@@ -1761,6 +1999,7 @@ async function dispatch(inner) {
 
 function addMsg(m) {
   if (!m.msgId) m.msgId = 'msg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+  if (m.dir === 'in') SFX.receive();
   S.messages.push(m); renderMsgs();
 }
 function addSys(t) { S.messages.push({ sys: true, text: t }); renderMsgs(); }
@@ -1800,22 +2039,48 @@ function renderMsgs() {
       const d = document.createElement('div'); d.className = 'date-div';
       d.innerHTML = `<span>${m.date}</span>`; c.insertBefore(d, typ);
     }
-    const row = document.createElement('div'); row.className = `mrow ${m.dir}`;
+    const row = document.createElement('div');
+    row.className = `mrow ${m.dir}`;
+    if (m.msgId) row.id = 'm-' + m.msgId;
+
     const multi = Object.keys(S.members).length > 1;
     const sn = m.dir === 'in' && multi ? `<div class="bbl-sn">${esc(m.senderName || '?')}</div>` : '';
     const mt = m.msgType || 'text';
+
+    // Reply quote block
+    let quoteHtml = '';
+    if (m.replyTo) {
+      quoteHtml = `<div class="reply-quote" onclick="jumpToMsg('${m.replyTo.msgId}')">
+        <div class="reply-quote-name">${esc(m.replyTo.name)}</div>
+        ${esc(m.replyTo.text).slice(0, 80)}${m.replyTo.text.length > 80 ? '…' : ''}
+      </div>`;
+    }
+
     let body = '';
-    if (mt === 'text') body = `${sn}<div class="bbl-txt">${escnl(m.text)}</div>`;
-    else if (mt === 'image') body = `${sn}<img class="img-bbl" src="${m.data}" onclick="openLB('img','${m.data}')"/>`;
-    else if (mt === 'video') body = `${sn}<video class="vid-bbl" src="${m.data}" controls playsinline></video>`;
-    else if (mt === 'audio') body = sn + mkAud(m);
+    if (mt === 'text') body = `${sn}${quoteHtml}<div class="bbl-txt">${escnl(m.text)}</div>`;
+    else if (mt === 'image') body = `${sn}${quoteHtml}<img class="img-bbl" src="${m.data}" onclick="openLB('img','${m.data}')"/>`;
+    else if (mt === 'video') body = `${sn}${quoteHtml}<video class="vid-bbl" src="${m.data}" controls playsinline></video>`;
+    else if (mt === 'audio') body = sn + quoteHtml + mkAud(m);
     else if (mt === 'document' || mt === 'file')
-      body = `${sn}<div class="doc-bbl" onclick="dlFile('${m.data}','${esc(m.fileName || 'file')}')"><div class="doc-ico">📄</div><div><div class="doc-name">${esc(m.fileName || 'File')}</div><div class="doc-size">${m.fileSize || ''} · Tap to download</div></div></div>`;
-    else if (mt === 'location') body = sn + mkLoc(m);
-    else body = `${sn}<div class="bbl-txt">${esc(m.text || '[media]')}</div>`;
+      body = `${sn}${quoteHtml}<div class="doc-bbl" onclick="dlFile('${m.data}','${esc(m.fileName || 'file')}')"><div class="doc-ico">📄</div><div><div class="doc-name">${esc(m.fileName || 'File')}</div><div class="doc-size">${m.fileSize || ''} · Tap to download</div></div></div>`;
+    else if (mt === 'location') body = sn + quoteHtml + mkLoc(m);
+    else body = `${sn}${quoteHtml}<div class="bbl-txt">${esc(m.text || '[media]')}</div>`;
+
     const tick = m.dir === 'out' ? `<span class="bbl-tick"><svg viewBox="0 0 18 11" fill="none"><path d="M1 5.5L5.5 10L17 1" stroke="#18ffff" stroke-width="1.8" stroke-linecap="round"/><path d="M6 5.5L10.5 10L22 1" stroke="#18ffff" stroke-width="1.8" stroke-linecap="round"/></svg></span>` : '';
-    row.innerHTML = `<div class="bbl"><div>${body}</div><div class="bbl-meta"><span class="bbl-time">${m.time || ''}</span>${tick}</div><div class="react-bar" id="rb-${m.msgId}">${buildReacts(m.msgId)}</div></div>`;
-    if (m.msgId) setupLP(row.querySelector('.bbl'), m.msgId);
+
+    row.innerHTML = `
+      <div class="reply-arrow">↩</div>
+      <div class="bbl">
+        <div>${body}</div>
+        <div class="bbl-meta"><span class="bbl-time">${m.time || ''}</span>${tick}</div>
+        <div class="react-bar" id="rb-${m.msgId}">${buildReacts(m.msgId)}</div>
+      </div>`;
+
+    const bbl = row.querySelector('.bbl');
+    if (m.msgId) {
+      setupLP(bbl, m.msgId);
+      setupDragReply(row, bbl, m);
+    }
     c.insertBefore(row, typ);
   });
   c.scrollTop = c.scrollHeight;
@@ -1905,6 +2170,7 @@ async function startVoice() {
     };
     S.mediaRecorder.start(100); S.isRecording = true;
     S.recInt = setInterval(() => S.recSec++, 1000);
+    SFX.recStart();
     const btn = document.getElementById('mic-btn'); btn.classList.add('rec');
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="var(--red)" style="width:16px;height:16px"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
     document.getElementById('att-menu').classList.remove('open');
@@ -1914,6 +2180,7 @@ async function startVoice() {
 function stopVoice() {
   if (S.mediaRecorder && S.mediaRecorder.state !== 'inactive') S.mediaRecorder.stop();
   clearInterval(S.recInt); S.isRecording = false;
+  SFX.recStop();
   const btn = document.getElementById('mic-btn'); btn.classList.remove('rec');
   btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
 }
@@ -1940,8 +2207,7 @@ function switchEk(i) {
 function toggleEkb() { document.getElementById('ekb').classList.toggle('open'); document.getElementById('att-menu').classList.remove('open'); }
 function insEmoji(e) {
   const inp = document.getElementById('msg-inp'); inp.value += e; inp.focus();
-  document.getElementById('send-btn').style.display = 'flex';
-  document.getElementById('mic-btn').style.display = 'none';
+  updSendBtn();
   addRecent(e);
 }
 function addRecent(e) {
@@ -2033,9 +2299,548 @@ function submitPass() {
 }
 
 // ────────────────────────────────────────────────────────────
-//  UTILS
+//  SOUND ENGINE — Web Audio API (no external files needed)
 // ────────────────────────────────────────────────────────────
-function hk(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
+const SFX = (() => {
+  let ctx = null, enabled = true;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function play(fn) { if (!enabled) return; try { fn(getCtx()); } catch(e){} }
+
+  // Outgoing message — clean soft "whoosh pop"
+  function send() {
+    play(c => {
+      const t = c.currentTime;
+      // Quick high sweep
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      const filter = c.createBiquadFilter();
+      filter.type = 'bandpass'; filter.frequency.value = 1800; filter.Q.value = 2;
+      osc.connect(filter); filter.connect(gain); gain.connect(c.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(420, t);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(1400, t + 0.13);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.start(t); osc.stop(t + 0.23);
+
+      // Soft "tick" underneath
+      const osc2 = c.createOscillator();
+      const g2 = c.createGain();
+      osc2.connect(g2); g2.connect(c.destination);
+      osc2.type = 'triangle'; osc2.frequency.value = 660;
+      g2.gain.setValueAtTime(0.1, t + 0.04);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc2.start(t + 0.04); osc2.stop(t + 0.19);
+    });
+  }
+
+  // Incoming message — warm double chime
+  function receive() {
+    play(c => {
+      const t = c.currentTime;
+      [[520, 0, 0.28], [780, 0.1, 0.32]].forEach(([freq, delay, dur]) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.connect(gain); gain.connect(c.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, t + delay);
+        gain.gain.linearRampToValueAtTime(0.14, t + delay + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + delay + dur);
+        osc.start(t + delay); osc.stop(t + delay + dur + 0.01);
+      });
+    });
+  }
+
+  // Voice recording start — deep "bwoom" + rising tone
+  function recStart() {
+    play(c => {
+      const t = c.currentTime;
+      // Deep punch
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.connect(gain); gain.connect(c.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(100, t);
+      osc.frequency.exponentialRampToValueAtTime(55, t + 0.15);
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.26);
+
+      // Rising beep to signal recording
+      const osc2 = c.createOscillator();
+      const g2 = c.createGain();
+      osc2.connect(g2); g2.connect(c.destination);
+      osc2.type = 'square'; osc2.frequency.value = 880;
+      g2.gain.setValueAtTime(0.06, t + 0.12);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      osc2.start(t + 0.12); osc2.stop(t + 0.29);
+    });
+  }
+
+  // Voice recording stop — descending two-tone
+  function recStop() {
+    play(c => {
+      const t = c.currentTime;
+      [[880, 0], [660, 0.1]].forEach(([freq, delay]) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.connect(gain); gain.connect(c.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, t + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.2);
+        osc.start(t + delay); osc.stop(t + delay + 0.21);
+      });
+    });
+  }
+
+  // Panic — urgent descending alarm burst
+  function panic() {
+    play(c => {
+      const t = c.currentTime;
+      for (let i = 0; i < 3; i++) {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.connect(gain); gain.connect(c.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880 - i * 160, t + i * 0.12);
+        osc.frequency.exponentialRampToValueAtTime(220, t + i * 0.12 + 0.1);
+        gain.gain.setValueAtTime(0.18, t + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.12);
+        osc.start(t + i * 0.12); osc.stop(t + i * 0.12 + 0.13);
+      }
+    });
+  }
+
+  function toggle() {
+    enabled = !enabled;
+    const btn = document.getElementById('snd-btn');
+    btn.textContent = enabled ? '🔊' : '🔇';
+    btn.classList.toggle('muted', !enabled);
+    toast(enabled ? '🔊 Sounds on' : '🔇 Sounds off');
+  }
+
+  return { send, receive, recStart, recStop, panic, toggle };
+})();
+
+function toggleSound() { SFX.toggle(); }
+
+// ────────────────────────────────────────────────────────────
+//  PANIC BUTTON
+// ────────────────────────────────────────────────────────────
+let panicTimer = null, panicCount = 3, panicRAF = null, panicStart = null;
+
+function triggerPanic() {
+  SFX.panic();
+  panicCount = 3;
+  document.getElementById('panic-timer').textContent = panicCount;
+  document.getElementById('panic-bar-fill').style.width = '100%';
+  document.getElementById('panic-overlay').classList.add('open');
+  panicStart = performance.now();
+
+  function tick(now) {
+    const elapsed = now - panicStart;
+    const total = 3000;
+    const remaining = Math.max(0, total - elapsed);
+    const pct = (remaining / total) * 100;
+    const secs = Math.ceil(remaining / 1000);
+
+    document.getElementById('panic-bar-fill').style.width = pct + '%';
+    if (secs !== panicCount) {
+      panicCount = secs;
+      document.getElementById('panic-timer').textContent = panicCount || '💥';
+      if (panicCount > 0) SFX.panic();
+    }
+
+    if (remaining <= 0) { executePanic(); return; }
+    panicRAF = requestAnimationFrame(tick);
+  }
+  panicRAF = requestAnimationFrame(tick);
+
+  // Also listen for Escape key to cancel
+  document.addEventListener('keydown', escCancel, { once: true });
+}
+
+function escCancel(e) { if (e.key === 'Escape') cancelPanic(); }
+
+function cancelPanic() {
+  cancelAnimationFrame(panicRAF);
+  clearInterval(panicTimer);
+  document.getElementById('panic-overlay').classList.remove('open');
+  document.removeEventListener('keydown', escCancel);
+  toast('Panic cancelled');
+}
+
+function executePanic() {
+  cancelAnimationFrame(panicRAF);
+  document.getElementById('panic-overlay').classList.remove('open');
+
+  // 1. Broadcast delete to all peers
+  try {
+    RTC.bcast({ type: 'delete_chat', from: S.myId });
+    sigCh?.publish('delete_chat', { from: S.myId });
+  } catch { }
+
+  // 2. Wipe all local state
+  S.messages = []; S.reactions = {}; S.members = {};
+  E2E.wipe();
+
+  // 3. Disconnect everything
+  try { RTC.closeAll(); } catch { }
+  try { disconnectSig(); } catch { }
+  booted = false; S.connMode = 'none'; S.isCreator = false;
+  S.rooms = []; S.name = ''; S.room = ''; S.roomPass = '';
+
+  // 4. Clear all storage (just in case)
+  try { sessionStorage.clear(); localStorage.clear(); } catch { }
+
+  // 5. Flash screen red then go home
+  const flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(255,0,0,.4);pointer-events:none;transition:opacity .5s';
+  document.body.appendChild(flash);
+  setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 500); }, 200);
+
+  // 6. Reset UI
+  document.getElementById('cwin').style.display = 'none';
+  document.getElementById('wlc').style.display = 'flex';
+  renderCL();
+  updateConnBadge();
+  show('home');
+  toast('💥 All data wiped');
+}
+
+// ────────────────────────────────────────────────────────────
+//  DRAG-TO-REPLY  (pointer events — works on mobile + desktop)
+// ────────────────────────────────────────────────────────────
+function setupDragReply(row, bbl, m) {
+  const DIR = m.dir; // 'in' or 'out'
+  const THRESHOLD = 62; // px drag distance to trigger
+  let startX = 0, startY = 0, dx = 0, dragging = false, triggered = false;
+
+  function onDown(e) {
+    // Don't steal from scrolling or reaction picker
+    if (e.target.closest('.r-picker') || e.target.closest('.reply-quote') || e.target.closest('video') || e.target.closest('audio')) return;
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    dx = 0; dragging = false; triggered = false;
+  }
+
+  function onMove(e) {
+    if (!startX) return;
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    const adx = Math.abs(cx - startX);
+    const ady = Math.abs(cy - startY);
+
+    // If more vertical than horizontal early on, let the scroll happen
+    if (!dragging && ady > adx && ady > 8) { startX = 0; return; }
+    if (!dragging && adx < 6) return;
+
+    dragging = true;
+    // out-bubbles swipe left (negative), in-bubbles swipe right (positive)
+    const raw = cx - startX;
+    dx = DIR === 'out' ? Math.min(0, raw) : Math.max(0, raw); // constrain direction
+    const clamped = Math.max(-THRESHOLD * 1.1, Math.min(THRESHOLD * 1.1, dx));
+
+    bbl.style.transform = `translateX(${clamped}px)`;
+    row.classList.toggle('reply-ready', Math.abs(clamped) >= THRESHOLD * 0.7);
+
+    if (Math.abs(dx) >= THRESHOLD && !triggered) {
+      triggered = true;
+      triggerReply(m);
+    }
+    if (e.cancelable) e.preventDefault();
+  }
+
+  function onUp() {
+    if (!dragging) { startX = 0; return; }
+    // Snap back with spring
+    bbl.style.transition = 'transform .35s cubic-bezier(.34,1.56,.64,1)';
+    bbl.style.transform = 'translateX(0)';
+    bbl.addEventListener('transitionend', () => { bbl.style.transition = ''; }, { once: true });
+    row.classList.remove('dragging', 'reply-ready');
+    startX = 0; dragging = false;
+  }
+
+  // Touch (mobile)
+  row.addEventListener('touchstart', onDown, { passive: true });
+  row.addEventListener('touchmove', onMove, { passive: false });
+  row.addEventListener('touchend', onUp);
+  row.addEventListener('touchcancel', onUp);
+  // Mouse (desktop)
+  row.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', e => { if (startX && dragging) onMove(e); });
+  window.addEventListener('mouseup', onUp);
+}
+
+function triggerReply(m) {
+  const preview = m.msgType === 'text' ? (m.text || '') : `[${m.msgType}]`;
+  const name = m.dir === 'out' ? (S.name || 'You') : (m.senderName || '?');
+  setReply(m.msgId, name, preview);
+  try { navigator.vibrate?.([10, 30, 10]); } catch {}
+}
+
+// ────────────────────────────────────────────────────────────
+//  AMBIENCE ENGINE  — pure Web Audio, zero network
+// ────────────────────────────────────────────────────────────
+const AMB = (() => {
+  let ctx = null, gainNode = null, activeNodes = [], currentTrack = null, vol = 0.5;
+  const tracks = [
+    { id: 'lofi',   name: 'Lo-Fi Beats',    desc: 'Chill hip-hop warmth',  icon: '🎹', fn: makeLofi },
+    { id: 'rain',   name: 'Rain',            desc: 'Heavy rain on glass',   icon: '🌧️', fn: makeRain },
+    { id: 'cafe',   name: 'Café',            desc: 'Gentle café chatter',   icon: '☕', fn: makeCafe },
+    { id: 'forest', name: 'Forest',          desc: 'Birds & wind',          icon: '🌲', fn: makeForest },
+    { id: 'ocean',  name: 'Ocean Waves',     desc: 'Rolling surf',          icon: '🌊', fn: makeOcean },
+    { id: 'white',  name: 'White Noise',     desc: 'Pure focus static',     icon: '📻', fn: makeWhite },
+  ];
+
+  function getCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = ctx.createGain(); gainNode.gain.value = vol; gainNode.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function stop() {
+    activeNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch {} });
+    activeNodes = []; currentTrack = null;
+    document.getElementById('amb-btn').classList.remove('playing');
+    document.querySelectorAll('.amb-track').forEach(t => t.classList.remove('active'));
+  }
+
+  function play(trackId) {
+    const t = tracks.find(x => x.id === trackId);
+    if (!t) return;
+    if (currentTrack === trackId) { stop(); return; } // toggle off
+    stop();
+    getCtx();
+    currentTrack = trackId;
+    t.fn(ctx, gainNode, activeNodes);
+    document.getElementById('amb-btn').classList.add('playing');
+    document.querySelectorAll('.amb-track').forEach(el => el.classList.toggle('active', el.dataset.id === trackId));
+  }
+
+  function setVol(v) {
+    vol = v / 100;
+    if (gainNode) gainNode.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
+    // Update slider gradient
+    const sl = document.getElementById('amb-vol');
+    if (sl) sl.style.background = `linear-gradient(to right,var(--g2) ${v}%,var(--bg4) ${v}%)`;
+  }
+
+  function buildUI() {
+    const tc = document.getElementById('amb-tracks'); if (!tc) return;
+    tc.innerHTML = tracks.map(t =>
+      `<div class="amb-track" data-id="${t.id}" onclick="AMB.play('${t.id}')">
+        <div class="amb-track-ico">${t.icon}</div>
+        <div class="amb-track-info"><div class="amb-track-name">${t.name}</div><div class="amb-track-desc">${t.desc}</div></div>
+        <div class="amb-track-ind"></div>
+      </div>`
+    ).join('');
+  }
+
+  // ── GENERATORS ──────────────────────────────────────────
+  function makeRain(c, out, nodes) {
+    // Brown noise (rain-like) via AudioWorklet fallback: use multiple filtered buffers
+    const buf = c.createBuffer(1, c.sampleRate * 3, c.sampleRate);
+    const data = buf.getChannelData(0);
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for (let i = 0; i < data.length; i++) {
+      const w = Math.random() * 2 - 1;
+      b0=.99886*b0+w*.0555179; b1=.99332*b1+w*.0750759;
+      b2=.96900*b2+w*.1538520; b3=.86650*b3+w*.3104856;
+      b4=.55000*b4+w*.5329522; b5=-.7616*b5-w*.0168980;
+      data[i] = (b0+b1+b2+b3+b4+b5+b6+w*.5362)*0.11; b6=w*.115926;
+    }
+    function loop() {
+      const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+      const filt = c.createBiquadFilter(); filt.type='highpass'; filt.frequency.value=200;
+      const g = c.createGain(); g.gain.value = 1.4;
+      src.connect(filt); filt.connect(g); g.connect(out);
+      src.start(); nodes.push(src);
+    }
+    loop();
+    // High-freq sizzle for drops
+    const siz = c.createOscillator(); siz.type='sawtooth'; siz.frequency.value=80;
+    const sf = c.createBiquadFilter(); sf.type='bandpass'; sf.frequency.value=8000; sf.Q.value=0.5;
+    const sg = c.createGain(); sg.gain.value=0.018;
+    siz.connect(sf); sf.connect(sg); sg.connect(out); siz.start(); nodes.push(siz);
+  }
+
+  function makeLofi(c, out, nodes) {
+    const bpm = 82, beat = 60/bpm;
+    // Kick drum
+    function kick(t) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(40,t+.12);
+      g.gain.setValueAtTime(.9,t); g.gain.exponentialRampToValueAtTime(.001,t+.25);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t+.26); nodes.push(o);
+    }
+    // Snare
+    function snare(t) {
+      const buf=c.createBuffer(1,c.sampleRate*.18,c.sampleRate);
+      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+      const src=c.createBufferSource(); src.buffer=buf;
+      const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=1800;
+      const g=c.createGain(); g.gain.setValueAtTime(.38,t); g.gain.exponentialRampToValueAtTime(.001,t+.18);
+      src.connect(f); f.connect(g); g.connect(out); src.start(t); nodes.push(src);
+    }
+    // Hi-hat
+    function hat(t,vol=.13) {
+      const buf=c.createBuffer(1,c.sampleRate*.06,c.sampleRate);
+      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+      const src=c.createBufferSource(); src.buffer=buf;
+      const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
+      const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+.06);
+      src.connect(f); f.connect(g); g.connect(out); src.start(t); nodes.push(src);
+    }
+    // Bass note
+    function bass(t,freq) {
+      const o=c.createOscillator(),g=c.createGain();
+      o.type='triangle'; o.frequency.value=freq;
+      g.gain.setValueAtTime(.22,t); g.gain.exponentialRampToValueAtTime(.001,t+beat*.9);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t+beat); nodes.push(o);
+    }
+    const bassline=[55,55,49,52,55,55,49,46];
+    let t = c.currentTime + 0.1;
+    let step = 0;
+    function scheduleBeat() {
+      const b4 = beat * 4;
+      kick(t); kick(t+beat*2);
+      snare(t+beat); snare(t+beat*3);
+      for(let i=0;i<8;i++) hat(t+beat*i*.5, i%2===0?.15:.09);
+      for(let i=0;i<4;i++) bass(t+beat*i, bassline[(step*4+i)%bassline.length]);
+      step=(step+1)%2; t+=b4;
+    }
+    scheduleBeat(); scheduleBeat(); // prime 2 bars ahead
+    const tid = setInterval(()=>{if(t-c.currentTime<beat*8) scheduleBeat();},beat*2000);
+    nodes.push({ stop:()=>clearInterval(tid) });
+    // Warm vinyl crackle
+    const crk=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
+    const cd=crk.getChannelData(0);
+    for(let i=0;i<cd.length;i++) cd[i]=Math.random()<.002?(Math.random()*2-1)*0.6:0;
+    const csrc=c.createBufferSource(); csrc.buffer=crk; csrc.loop=true;
+    const cg=c.createGain(); cg.gain.value=0.06;
+    csrc.connect(cg); cg.connect(out); csrc.start(); nodes.push(csrc);
+  }
+
+  function makeCafe(c, out, nodes) {
+    // Low chatter hum: multiple detuned band-pass noises
+    [280,420,600,900,1400].forEach((freq,i)=>{
+      const buf=c.createBuffer(1,c.sampleRate*4,c.sampleRate);
+      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=Math.random()*2-1;
+      const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
+      const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=freq; f.Q.value=1.5+i;
+      const g=c.createGain(); g.gain.value=0.045/(i+1);
+      src.connect(f); f.connect(g); g.connect(out); src.start(Math.random()*.5); nodes.push(src);
+    });
+    // Occasional cup clink: short sine click
+    function clink() {
+      const t=c.currentTime+Math.random()*8+2;
+      const o=c.createOscillator(),g=c.createGain();
+      o.frequency.value=1200+Math.random()*400; o.type='sine';
+      g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.001,t+.3);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t+.31); nodes.push(o);
+      if(currentTrack==='cafe') setTimeout(clink,(2+Math.random()*9)*1000);
+    }
+    clink();
+    // Gentle espresso machine hiss
+    const hissBuf=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
+    const hd=hissBuf.getChannelData(0); for(let i=0;i<hd.length;i++) hd[i]=Math.random()*2-1;
+    const hs=c.createBufferSource(); hs.buffer=hissBuf; hs.loop=true;
+    const hf=c.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=4000;
+    const hg=c.createGain(); hg.gain.value=0.025;
+    hs.connect(hf); hf.connect(hg); hg.connect(out); hs.start(); nodes.push(hs);
+  }
+
+  function makeForest(c, out, nodes) {
+    // Wind: slow LFO on filtered noise
+    const buf=c.createBuffer(1,c.sampleRate*4,c.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
+    const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=400; f.Q.value=0.8;
+    const lfo=c.createOscillator(); lfo.frequency.value=0.12; lfo.type='sine';
+    const lfog=c.createGain(); lfog.gain.value=180;
+    lfo.connect(lfog); lfog.connect(f.frequency);
+    const g=c.createGain(); g.gain.value=0.28;
+    src.connect(f); f.connect(g); g.connect(out); src.start(); lfo.start(); nodes.push(src,lfo);
+    // Bird chirps
+    function chirp() {
+      const t=c.currentTime+Math.random()*6+1;
+      const freq=2000+Math.random()*1500;
+      const o=c.createOscillator(),g2=c.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(freq,t);
+      o.frequency.linearRampToValueAtTime(freq*1.3,t+.06);
+      o.frequency.linearRampToValueAtTime(freq*.9,t+.14);
+      g2.gain.setValueAtTime(.04,t); g2.gain.exponentialRampToValueAtTime(.001,t+.2);
+      o.connect(g2); g2.connect(out); o.start(t); o.stop(t+.22); nodes.push(o);
+      if(currentTrack==='forest') setTimeout(chirp,(1+Math.random()*5)*1000);
+    }
+    chirp(); chirp();
+  }
+
+  function makeOcean(c, out, nodes) {
+    // Two detuned noise bands for wave rhythm
+    [1,2].forEach(i=>{
+      const buf=c.createBuffer(1,c.sampleRate*8,c.sampleRate);
+      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=Math.random()*2-1;
+      const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
+      const f=c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=600;
+      const lfo=c.createOscillator(); lfo.frequency.value=.09+i*.04; lfo.type='sine';
+      const lg=c.createGain(); lg.gain.value=.35;
+      lfo.connect(lg); lg.connect(f.frequency);
+      const g=c.createGain(); g.gain.value=.22;
+      src.connect(f); f.connect(g); g.connect(out);
+      src.start(i*1.5); lfo.start(); nodes.push(src,lfo);
+    });
+    // Gentle splash pops
+    function splash() {
+      const t=c.currentTime+4+Math.random()*4;
+      const buf=c.createBuffer(1,c.sampleRate*.5,c.sampleRate);
+      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+      const src=c.createBufferSource(); src.buffer=buf;
+      const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1200; f.Q.value=1;
+      const g=c.createGain(); g.gain.setValueAtTime(.04,t); g.gain.exponentialRampToValueAtTime(.001,t+.5);
+      src.connect(f); f.connect(g); g.connect(out); src.start(t); nodes.push(src);
+      if(currentTrack==='ocean') setTimeout(splash,(3+Math.random()*5)*1000);
+    }
+    splash();
+  }
+
+  function makeWhite(c, out, nodes) {
+    const buf=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
+    const g=c.createGain(); g.gain.value=.18;
+    src.connect(g); g.connect(out); src.start(); nodes.push(src);
+  }
+
+  return { play, stop, setVol, buildUI, tracks, get current() { return currentTrack; } };
+})();
+
+function toggleAmbPanel() {
+  const p = document.getElementById('amb-panel');
+  p.classList.toggle('open');
+  document.getElementById('att-menu').classList.remove('open');
+  document.getElementById('ekb').classList.remove('open');
+  if (p.classList.contains('open')) AMB.buildUI();
+}
+function setAmbVol(v) { AMB.setVol(v); }
+
+// Close amb panel on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#amb-btn') && !e.target.closest('.amb-panel'))
+    document.getElementById('amb-panel')?.classList.remove('open');
+});
+
+
 function ar(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
 function ft(d) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function fd(d) {
