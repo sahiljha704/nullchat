@@ -297,18 +297,46 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
 
 /* Chat list */
 .chat-list{flex:1;overflow-y:auto}
-.ci{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.022);transition:background .12s;position:relative}
+.ci{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.022);transition:background .18s,transform .15s;position:relative}
 .ci:hover,.ci.active{background:var(--gl1)}
-.ci.active::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;background:var(--g);border-radius:0 2px 2px 0}
-.ci-av{width:42px;height:42px;border-radius:12px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;border:1px solid var(--bdr);position:relative}
+.ci:hover{transform:translateX(2px)}
+.ci.active::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;background:var(--g);border-radius:0 2px 2px 0;animation:ci-bar-in .2s cubic-bezier(.34,1.56,.64,1)}
+@keyframes ci-bar-in{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.ci-av{width:42px;height:42px;border-radius:12px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;border:1px solid var(--bdr);position:relative;transition:transform .15s}
+.ci:hover .ci-av{transform:scale(1.05)}
 .ci-badge{position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;border:2px solid var(--bg1);background:var(--g)}
+/* Typing ring on avatar */
+.typ-ring{
+  position:absolute;inset:-3px;border-radius:14px;
+  border:2px solid var(--g);
+  opacity:0;pointer-events:none;
+  box-shadow:0 0 0 0 rgba(0,230,118,.5);
+  transition:opacity .3s ease;
+}
+.typing .typ-ring{
+  opacity:1;
+  animation:typ-ring-pulse 1.2s ease-in-out infinite;
+}
+@keyframes typ-ring-pulse{
+  0%{box-shadow:0 0 0 0 rgba(0,230,118,.6);border-color:rgba(0,230,118,.9)}
+  50%{box-shadow:0 0 0 5px rgba(0,230,118,.0);border-color:rgba(0,230,118,.4)}
+  100%{box-shadow:0 0 0 0 rgba(0,230,118,.6);border-color:rgba(0,230,118,.9)}
+}
+/* Typing ring on mbr-item */
+.mbr-emo-wrap{position:relative;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.mbr-emo-wrap .typ-ring{inset:-3px;border-radius:12px}
+/* Typing ring on chat header avatar */
+.ch-av-wrap{position:relative;width:33px;height:33px;flex-shrink:0}
+.ch-av-wrap .ch-av{position:absolute;inset:0;border-radius:9px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:.95rem;border:1px solid var(--bdr)}
+.ch-av-wrap .typ-ring{inset:-3px;border-radius:12px}
 .ci-info{flex:1;min-width:0}
 .ci-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
 .ci-name{font-size:.82rem;font-weight:700;color:var(--tx)}
 .ci-time{font-size:.6rem;color:var(--tx3)}
 .ci-preview{display:flex;align-items:center}
 .ci-msg{font-size:.71rem;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-.ci-unread{background:var(--g2);color:#fff;font-size:.55rem;font-weight:800;border-radius:9px;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;padding:0 4px;margin-left:4px}
+.ci-unread{background:var(--g2);color:#fff;font-size:.55rem;font-weight:800;border-radius:9px;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;padding:0 4px;margin-left:4px;animation:unread-pop .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes unread-pop{from{transform:scale(0)}to{transform:scale(1)}}
 
 /* ═══ RIGHT PANEL ═══ */
 .rp{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative}
@@ -428,7 +456,84 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
 .bg-blush{background:linear-gradient(160deg,#fff7ed,#ffedd5)}
 
 /* ═══ MESSAGES ═══ */
-.mrow{display:flex;margin-bottom:1px;position:relative;z-index:1;animation:msg-in .2s cubic-bezier(.34,1.56,.64,1) both}
+.mrow{display:flex;margin-bottom:2px;position:relative;z-index:1;animation:msg-in .28s cubic-bezier(.34,1.56,.64,1) both}
+.mrow.out{animation:msg-in-out .28s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes msg-in{from{opacity:0;transform:translateY(14px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes msg-in-out{from{opacity:0;transform:translateY(14px) translateX(14px) scale(.94)}to{opacity:1;transform:none}}
+
+/* ── POLL BUBBLE ── */
+.poll-bbl{min-width:220px;max-width:100%}
+.poll-q{font-size:.84rem;font-weight:700;color:var(--tx);margin-bottom:10px;line-height:1.4}
+.poll-opts{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.poll-opt{
+  position:relative;border:1.5px solid var(--bdr);border-radius:9px;
+  overflow:hidden;cursor:pointer;transition:border-color .18s,transform .15s;
+  padding:8px 11px;background:var(--bg3);
+}
+.poll-opt:hover{border-color:var(--bdr2);transform:translateX(2px)}
+.poll-opt.voted{border-color:var(--g2);cursor:default}
+.poll-opt.voted:hover{transform:none}
+.poll-opt-bar{
+  position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,230,118,.12),rgba(0,230,118,.06));
+  transform-origin:left;transform:scaleX(0);
+  transition:transform .6s cubic-bezier(.22,.68,0,1.2);border-radius:7px;
+}
+.poll-opt.voted .poll-opt-bar{/* width set via style */}
+.poll-opt-label{position:relative;font-size:.78rem;font-weight:600;color:var(--tx);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.poll-opt-pct{font-size:.65rem;color:var(--g2);font-weight:700;font-family:var(--mono);flex-shrink:0}
+.poll-opt-check{font-size:.7rem;flex-shrink:0;animation:check-pop .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes check-pop{from{transform:scale(0) rotate(-30deg)}to{transform:scale(1) rotate(0)}}
+.poll-footer{font-size:.62rem;color:var(--tx3);display:flex;align-items:center;gap:5px}
+.poll-badge{font-size:.58rem;background:var(--gl1);border:1px solid var(--bdr);color:var(--g2);padding:2px 7px;border-radius:8px;font-weight:600}
+
+/* ── MORE GLOBAL ANIMATIONS ── */
+/* Button press feedback */
+.ib-btn:active,.hdr-btn:active,.act:active,.cta-btn:active,.mbtn:active{transform:scale(.92) !important}
+/* Card hover lift */
+.card{transition:box-shadow .22s ease}
+.card:focus-within{box-shadow:0 12px 48px rgba(0,0,0,.8),0 0 0 1px var(--bdr2)}
+/* Profile overlay slide-in */
+.prof-over{transition:transform .28s cubic-bezier(.34,1.56,.64,1),opacity .22s ease}
+.prof-over:not(.open){transform:translateX(-100%);opacity:0}
+.prof-over.open{transform:translateX(0);opacity:1}
+/* Members panel slide-in */
+.mbr-panel{transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.mbr-panel:not(.open){transform:translateX(100%)}
+.mbr-panel.open{transform:translateX(0)}
+/* Smooth member item appear */
+.mbr-item{animation:mbr-in .2s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes mbr-in{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+/* Reply bar slide */
+.reply-bar{transition:max-height .22s ease,opacity .18s ease;max-height:0;opacity:0;overflow:hidden}
+.reply-bar.show{max-height:52px;opacity:1;display:flex}
+/* Att menu item hover */
+.att-item{transition:background .14s,transform .15s cubic-bezier(.34,1.56,.64,1)}
+.att-item:active{transform:scale(.9)}
+/* Modal pop */
+@keyframes modal-in{from{opacity:0;transform:scale(.82) translateY(12px)}to{opacity:1;transform:none}}
+/* Home act buttons stagger */
+.act-list .act:nth-child(1){animation:act-stagger .4s cubic-bezier(.34,1.56,.64,1) .1s both}
+.act-list .act:nth-child(2){animation:act-stagger .4s cubic-bezier(.34,1.56,.64,1) .18s both}
+.act-list .act:nth-child(3){animation:act-stagger .4s cubic-bezier(.34,1.56,.64,1) .26s both}
+@keyframes act-stagger{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
+/* Feat pills stagger */
+.feat-pills .fp{animation:fp-in .35s ease both}
+.feat-pills .fp:nth-child(1){animation-delay:.35s}
+.feat-pills .fp:nth-child(2){animation-delay:.4s}
+.feat-pills .fp:nth-child(3){animation-delay:.45s}
+.feat-pills .fp:nth-child(4){animation-delay:.5s}
+.feat-pills .fp:nth-child(5){animation-delay:.55s}
+@keyframes fp-in{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+/* Toast slide up */
+@keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+#toast.show{animation:toast-in .22s cubic-bezier(.34,1.56,.64,1) forwards}
+/* Send ripple fades */
+.send-ripple{animation:send-ripple-burst .5s ease-out forwards}
+/* Sys message appear */
+.sys-msg{animation:sys-in .22s ease both}
+@keyframes sys-in{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+/* Date divider */
+.date-div{animation:sys-in .22s ease both}
 @keyframes msg-in{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
 .mrow.out{justify-content:flex-end}
 .bbl{max-width:68%;padding:8px 11px 6px;border-radius:16px;position:relative;word-break:break-word;line-height:1.5;cursor:pointer}
@@ -457,6 +562,56 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
 
 /* System messages & dates */
 .sys-msg{align-self:center;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);padding:3px 11px;border-radius:9px;font-size:.6rem;color:var(--tx2);margin:4px 0;border:1px solid var(--bdr);z-index:1;position:relative}
+
+/* ── WHISPER ── */
+/* Bubble styling — purple tint, slightly translucent, italic */
+.mrow.whisper-out .bbl{
+  background:linear-gradient(145deg,rgba(60,20,90,.92) 0%,rgba(100,40,160,.85) 100%);
+  border-bottom-right-radius:3px;
+  box-shadow:0 2px 14px rgba(124,77,255,.35),inset 0 1px 0 rgba(255,255,255,.08);
+  border:1px solid rgba(124,77,255,.4);
+}
+.mrow.whisper-out .bbl::after{border-left-color:rgba(100,40,160,.85)}
+.mrow.whisper-in .bbl{
+  background:linear-gradient(145deg,rgba(40,15,70,.92),rgba(80,30,130,.85));
+  border-bottom-left-radius:3px;
+  box-shadow:0 2px 14px rgba(124,77,255,.3),inset 0 1px 0 rgba(255,255,255,.06);
+  border:1px solid rgba(124,77,255,.4);
+}
+.mrow.whisper-in .bbl::before{border-right-color:rgba(80,30,130,.85)}
+.whisper-tag{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.58rem;font-weight:700;letter-spacing:.5px;
+  color:rgba(180,140,255,.9);text-transform:uppercase;
+  margin-bottom:4px;
+}
+.whisper-tag svg{width:10px;height:10px;fill:none;stroke:rgba(180,140,255,.9);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mrow.whisper-out .bbl-time,.mrow.whisper-in .bbl-time{color:rgba(180,140,255,.4)}
+/* Whisper placeholder shown to other members */
+.whisper-ghost{
+  align-self:center;background:rgba(60,20,90,.22);
+  backdrop-filter:blur(8px);padding:3px 11px;border-radius:9px;
+  font-size:.6rem;color:rgba(180,140,255,.55);margin:4px 0;
+  border:1px solid rgba(124,77,255,.18);z-index:1;position:relative;
+  font-style:italic;
+}
+/* Whisper compose bar */
+.whisper-bar{
+  display:none;flex-direction:row;align-items:center;gap:8px;
+  background:linear-gradient(135deg,rgba(60,20,90,.7),rgba(90,30,150,.6));
+  border-top:1px solid rgba(124,77,255,.35);
+  padding:6px 12px;flex-shrink:0;animation:whisper-bar-in .22s cubic-bezier(.34,1.56,.64,1);
+}
+.whisper-bar.show{display:flex}
+@keyframes whisper-bar-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.whisper-to{font-size:.62rem;font-weight:700;color:rgba(180,140,255,.9);white-space:nowrap;display:flex;align-items:center;gap:5px;flex-shrink:0}
+.whisper-to svg{width:11px;height:11px;fill:none;stroke:rgba(180,140,255,.9);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.whisper-dismiss{background:none;border:none;color:rgba(180,140,255,.6);cursor:pointer;font-size:.95rem;padding:0 3px;line-height:1;transition:color .15s;flex-shrink:0}
+.whisper-dismiss:hover{color:rgba(255,100,100,.9)}
+/* Mbr-item long-press highlight */
+.mbr-item.lp-active{background:rgba(124,77,255,.12);border-radius:8px}
+.mbr-item .mbr-whisper-hint{font-size:.55rem;color:rgba(124,77,255,.7);margin-top:1px;display:none}
+.mbr-item:hover .mbr-whisper-hint{display:block}
 .date-div{display:flex;align-items:center;justify-content:center;margin:6px 0;z-index:1;position:relative}
 .date-div span{background:rgba(0,0,0,.35);backdrop-filter:blur(8px);color:var(--tx2);font-size:.6rem;padding:3px 10px;border-radius:8px;border:1px solid var(--bdr)}
 /* Typing */
@@ -535,6 +690,7 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
 .mic-btn.hidden{opacity:0;pointer-events:none;transform:scale(.6) rotate(20deg)}
 .mic-btn:hover{background:var(--gl2);border-color:var(--bdr2);color:var(--tx)}
 .mic-btn.rec{background:var(--red);border-color:var(--red);color:#fff;animation:mic-pulse 1s infinite}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,23,68,.5)}50%{box-shadow:0 0 0 9px rgba(255,23,68,0)}}
 .mic-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 /* Ripple particle on launch */
 .send-ripple{
@@ -922,7 +1078,10 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
       <!-- Chat header -->
       <div class="chat-hdr">
         <button class="back-mob" id="back-mob-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
-        <div class="ch-av" id="ch-av">👥</div>
+        <div class="ch-av-wrap" id="ch-av-wrap">
+          <div class="ch-av" id="ch-av">👥</div>
+          <div class="typ-ring"></div>
+        </div>
         <div class="ch-info">
           <div class="ch-name" id="ch-name">Room</div>
           <div class="ch-status waiting" id="ch-status">Waiting for peers...</div>
@@ -959,6 +1118,7 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
         <div class="att-item" onclick="trigFile('doc')"><div class="att-ico" style="background:rgba(24,255,255,.1)">📄</div><div class="att-lbl">Doc</div></div>
         <div class="att-item" onclick="shareLocation()"><div class="att-ico" style="background:rgba(0,230,118,.1)">📍</div><div class="att-lbl">Location</div></div>
         <div class="att-item" onclick="trigFile('any')"><div class="att-ico" style="background:rgba(255,171,64,.12)">📎</div><div class="att-lbl">File</div></div>
+        <div class="att-item" onclick="openPollModal()"><div class="att-ico" style="background:rgba(124,77,255,.12)">📊</div><div class="att-lbl">Poll</div></div>
         <div class="att-item" onclick="startVoice()"><div class="att-ico" style="background:rgba(255,23,68,.12)">🎙️</div><div class="att-lbl">Voice</div></div>
       </div>
 
@@ -1069,6 +1229,27 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
   <div class="panic-bar"><div class="panic-bar-fill" id="panic-bar-fill"></div></div>
   <button class="panic-cancel" onclick="cancelPanic()">Cancel — Keep Chat</button>
   <div class="panic-hint">HOLD POWER BUTTON OR PRESS ESC TO CANCEL</div>
+</div>
+
+<!-- POLL MODAL -->
+<div class="overlay" id="poll-modal">
+  <div class="modal" style="width:380px">
+    <h3>📊 Create a Poll</h3>
+    <p>Ask your chat a question. Everyone votes in real time.</p>
+    <div class="field"><span class="field-label">Question</span><input class="finp" id="poll-q" type="text" placeholder="What do you think about...?" maxlength="120" autocomplete="off"/></div>
+    <div class="field">
+      <span class="field-label">Options</span>
+      <div id="poll-opts-wrap" style="display:flex;flex-direction:column;gap:6px">
+        <input class="finp" placeholder="Option 1" maxlength="60" autocomplete="off"/>
+        <input class="finp" placeholder="Option 2" maxlength="60" autocomplete="off"/>
+      </div>
+      <button onclick="addPollOpt()" style="margin-top:7px;background:none;border:1.5px dashed var(--bdr2);color:var(--tx2);width:100%;padding:7px;border-radius:var(--r3);cursor:pointer;font-family:var(--font);font-size:.76rem;transition:all .18s" onmouseover="this.style.borderColor='var(--g2)';this.style.color='var(--g2)'" onmouseout="this.style.borderColor='var(--bdr2)';this.style.color='var(--tx2)'">+ Add Option</button>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="closeM('poll-modal')">Cancel</button>
+      <button class="mbtn mbtn-ok" onclick="submitPoll()">Send Poll</button>
+    </div>
+  </div>
 </div>
 
 <input type="file" id="fi-img" accept="image/*">
@@ -1634,6 +1815,7 @@ async function onSigMsg(msg) {
   else if (t === 'delete_chat') { nukeChat(); }
   else if (t === 'kick') { handleKick(d); }
   else if (t === 'react') { applyReaction(d); }
+  else if (t === 'poll_vote') { applyPollVote(d); }
   else if (t === 'msg') {
     // Relay fallback message — encrypted with roomKey
     const dec = await E2E.decrypt(d.payload, d.from);
@@ -1670,6 +1852,7 @@ async function onRTCMsg(pid, msg) {
   else if (t === 'kick') { handleKick(msg); }
   else if (t === 'typ') { showTyp(msg.v); }
   else if (t === 'react') { applyReaction(msg); }
+  else if (t === 'poll_vote') { applyPollVote(msg); }
 }
 
 function onPeerConn(pid) {
@@ -1873,14 +2056,22 @@ function updMbrs() {
   const n = Object.keys(S.members).length + 1;
   document.getElementById('mbr-title').textContent = `Members (${n})`;
   document.getElementById('mbr-list').innerHTML =
-    `<div class="mbr-item"><div class="mbr-emo">${S.avatar}</div><div class="mbr-info">
-     <div class="mbr-name">${esc(S.name)}${isAdmin ? '<span class="adm-tag">Admin</span>' : ''}</div>
-     <div class="mbr-you">You · ${S.connMode === 'webrtc' ? '🔗 P2P' : '📡'}</div></div></div>` +
+    `<div class="mbr-item">
+      <div class="mbr-emo-wrap"><span>${S.avatar}</span></div>
+      <div class="mbr-info">
+        <div class="mbr-name">${esc(S.name)}${isAdmin ? '<span class="adm-tag">Admin</span>' : ''}</div>
+        <div class="mbr-you">You · ${S.connMode === 'webrtc' ? '🔗 P2P' : '📡'}</div>
+      </div>
+    </div>` +
     Object.entries(S.members).map(([id, m]) =>
-      `<div class="mbr-item"><div class="mbr-emo">${m.avatar || '👤'}</div><div class="mbr-info">
-       <div class="mbr-name">${esc(m.name)}${id === S.adminId ? '<span class="adm-tag">Admin</span>' : ''}</div>
-       ${E2E.fp(id) ? `<div class="mbr-fp">🔐 ${E2E.fp(id)}</div>` : ''}</div>
-       ${isAdmin && id !== S.myId ? `<button class="kick-btn" onclick="promptKick('${id}','${esc(m.name)}')">Remove</button>` : ''}</div>`
+      `<div class="mbr-item">
+        <div class="mbr-emo-wrap peer"><span>${m.avatar || '👤'}</span><div class="typ-ring"></div></div>
+        <div class="mbr-info">
+          <div class="mbr-name">${esc(m.name)}${id === S.adminId ? '<span class="adm-tag">Admin</span>' : ''}</div>
+          ${E2E.fp(id) ? `<div class="mbr-fp">🔐 ${E2E.fp(id)}</div>` : ''}
+        </div>
+        ${isAdmin && id !== S.myId ? `<button class="kick-btn" onclick="promptKick('${id}','${esc(m.name)}')">Remove</button>` : ''}
+      </div>`
     ).join('');
 }
 function toggleMbrs() { document.getElementById('mbr-panel').classList.toggle('open'); }
@@ -2011,6 +2202,10 @@ function sendTyp() {
 }
 function showTyp(v) {
   document.getElementById('typ-ind').classList.toggle('show', v);
+  // Breathing ring on chat header avatar
+  document.getElementById('ch-av-wrap')?.classList.toggle('typing', v);
+  // Breathing ring on all member items in members panel
+  document.querySelectorAll('.mbr-emo-wrap.peer').forEach(el => el.classList.toggle('typing', v));
   const c = document.getElementById('chat-bg'); if (c) c.scrollTop = c.scrollHeight;
 }
 
@@ -2064,6 +2259,7 @@ function renderMsgs() {
     else if (mt === 'document' || mt === 'file')
       body = `${sn}${quoteHtml}<div class="doc-bbl" onclick="dlFile('${m.data}','${esc(m.fileName || 'file')}')"><div class="doc-ico">📄</div><div><div class="doc-name">${esc(m.fileName || 'File')}</div><div class="doc-size">${m.fileSize || ''} · Tap to download</div></div></div>`;
     else if (mt === 'location') body = sn + quoteHtml + mkLoc(m);
+    else if (mt === 'poll') body = sn + mkPoll(m);
     else body = `${sn}${quoteHtml}<div class="bbl-txt">${esc(m.text || '[media]')}</div>`;
 
     const tick = m.dir === 'out' ? `<span class="bbl-tick"><svg viewBox="0 0 18 11" fill="none"><path d="M1 5.5L5.5 10L17 1" stroke="#18ffff" stroke-width="1.8" stroke-linecap="round"/><path d="M6 5.5L10.5 10L22 1" stroke="#18ffff" stroke-width="1.8" stroke-linecap="round"/></svg></span>` : '';
@@ -2436,7 +2632,6 @@ function toggleSound() { SFX.toggle(); }
 let panicTimer = null, panicCount = 3, panicRAF = null, panicStart = null;
 
 function triggerPanic() {
-  SFX.panic();
   panicCount = 3;
   document.getElementById('panic-timer').textContent = panicCount;
   document.getElementById('panic-bar-fill').style.width = '100%';
@@ -2449,20 +2644,15 @@ function triggerPanic() {
     const remaining = Math.max(0, total - elapsed);
     const pct = (remaining / total) * 100;
     const secs = Math.ceil(remaining / 1000);
-
     document.getElementById('panic-bar-fill').style.width = pct + '%';
     if (secs !== panicCount) {
       panicCount = secs;
       document.getElementById('panic-timer').textContent = panicCount || '💥';
-      if (panicCount > 0) SFX.panic();
     }
-
     if (remaining <= 0) { executePanic(); return; }
     panicRAF = requestAnimationFrame(tick);
   }
   panicRAF = requestAnimationFrame(tick);
-
-  // Also listen for Escape key to cancel
   document.addEventListener('keydown', escCancel, { once: true });
 }
 
@@ -2586,26 +2776,157 @@ function triggerReply(m) {
 }
 
 // ────────────────────────────────────────────────────────────
-//  AMBIENCE ENGINE  — pure Web Audio, zero network
+//  POLLS
+// ────────────────────────────────────────────────────────────
+const polls = {}; // pollId → { question, options:[{text,voters:[]}], creator }
+
+function openPollModal() {
+  document.getElementById('att-menu').classList.remove('open');
+  document.getElementById('poll-q').value = '';
+  const w = document.getElementById('poll-opts-wrap');
+  w.innerHTML = '';
+  ['Option 1','Option 2'].forEach(ph => {
+    const i = document.createElement('input');
+    i.className = 'finp'; i.placeholder = ph; i.maxLength = 60; i.autocomplete = 'off';
+    w.appendChild(i);
+  });
+  document.getElementById('poll-modal').classList.add('open');
+  setTimeout(() => document.getElementById('poll-q').focus(), 80);
+}
+
+function addPollOpt() {
+  const w = document.getElementById('poll-opts-wrap');
+  if (w.children.length >= 6) { toast('Max 6 options'); return; }
+  const i = document.createElement('input');
+  i.className = 'finp'; i.placeholder = `Option ${w.children.length + 1}`; i.maxLength = 60; i.autocomplete = 'off';
+  i.style.animation = 'act-stagger .25s cubic-bezier(.34,1.56,.64,1) both';
+  w.appendChild(i); i.focus();
+}
+
+async function submitPoll() {
+  const q = document.getElementById('poll-q').value.trim();
+  if (!q) { toast('Enter a question'); return; }
+  const opts = [...document.getElementById('poll-opts-wrap').querySelectorAll('input')]
+    .map(i => i.value.trim()).filter(Boolean);
+  if (opts.length < 2) { toast('Add at least 2 options'); return; }
+  closeM('poll-modal');
+  const now = new Date();
+  const pollId = 'poll' + Date.now().toString(36);
+  polls[pollId] = { question: q, options: opts.map(t => ({ text: t, voters: [] })), creator: S.myId };
+  const inner = {
+    msgId: pollId, from: S.myId, sn: S.name, sa: S.avatar,
+    msgType: 'poll', pollId, question: q,
+    options: opts.map(t => ({ text: t, voters: [] })),
+    time: ft(now), date: fd(now)
+  };
+  await sendMedia(inner);
+}
+
+function votePoll(pollId, optIdx) {
+  const poll = polls[pollId];
+  if (!poll) return;
+  // Check if already voted
+  const alreadyVoted = poll.options.some(o => o.voters.includes(S.myId));
+  if (alreadyVoted) { toast('Already voted'); return; }
+  poll.options[optIdx].voters.push(S.myId);
+  const d = { type: 'poll_vote', pollId, optIdx, from: S.myId };
+  RTC.bcast(d); sigCh?.publish('poll_vote', { ...d });
+  renderMsgs();
+}
+
+function applyPollVote(d) {
+  const poll = polls[d.pollId];
+  if (!poll) return;
+  if (!poll.options[d.optIdx]) return;
+  if (!poll.options[d.optIdx].voters.includes(d.from))
+    poll.options[d.optIdx].voters.push(d.from);
+  renderMsgs();
+}
+
+function mkPoll(m) {
+  // Sync poll state
+  if (!polls[m.pollId]) polls[m.pollId] = { question: m.question, options: m.options.map(o => ({ text: o.text, voters: o.voters || [] })), creator: m.from };
+  const poll = polls[m.pollId];
+  const totalVotes = poll.options.reduce((s, o) => s + o.voters.length, 0);
+  const myVote = poll.options.findIndex(o => o.voters.includes(S.myId));
+  const voted = myVote >= 0;
+  const opts = poll.options.map((o, i) => {
+    const pct = totalVotes ? Math.round(o.voters.length / totalVotes * 100) : 0;
+    const isMyVote = myVote === i;
+    return `<div class="poll-opt${voted ? ' voted' : ''}" ${!voted ? `onclick="votePoll('${m.pollId}',${i})"` : ''}>
+      <div class="poll-opt-bar" style="transform:scaleX(${voted ? pct/100 : 0})"></div>
+      <div class="poll-opt-label">
+        <span>${esc(o.text)}</span>
+        <span style="display:flex;align-items:center;gap:4px">
+          ${voted ? `<span class="poll-opt-pct">${pct}%</span>` : ''}
+          ${isMyVote ? '<span class="poll-opt-check">✓</span>' : ''}
+        </span>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="poll-bbl">
+    <div class="poll-q">📊 ${esc(poll.question)}</div>
+    <div class="poll-opts">${opts}</div>
+    <div class="poll-footer">
+      <span class="poll-badge">${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</span>
+      ${!voted ? '<span style="color:var(--tx3)">Tap to vote</span>' : '<span style="color:var(--g2)">Voted ✓</span>'}
+    </div>
+  </div>`;
+}
+
+// ────────────────────────────────────────────────────────────
+//  AMBIENCE ENGINE — 8 peaceful Web Audio tracks
 // ────────────────────────────────────────────────────────────
 const AMB = (() => {
-  let ctx = null, gainNode = null, activeNodes = [], currentTrack = null, vol = 0.5;
+  let ctx = null, gainNode = null, reverbNode = null, activeNodes = [], currentTrack = null, vol = 0.45;
   const tracks = [
-    { id: 'lofi',   name: 'Lo-Fi Beats',    desc: 'Chill hip-hop warmth',  icon: '🎹', fn: makeLofi },
-    { id: 'rain',   name: 'Rain',            desc: 'Heavy rain on glass',   icon: '🌧️', fn: makeRain },
-    { id: 'cafe',   name: 'Café',            desc: 'Gentle café chatter',   icon: '☕', fn: makeCafe },
-    { id: 'forest', name: 'Forest',          desc: 'Birds & wind',          icon: '🌲', fn: makeForest },
-    { id: 'ocean',  name: 'Ocean Waves',     desc: 'Rolling surf',          icon: '🌊', fn: makeOcean },
-    { id: 'white',  name: 'White Noise',     desc: 'Pure focus static',     icon: '📻', fn: makeWhite },
+    { id: 'rain_soft',  name: 'Soft Rain',       desc: 'Gentle patter on leaves',   icon: '🌧', fn: makeSoftRain },
+    { id: 'deep_space', name: 'Deep Space',       desc: 'Cosmic drone & shimmer',    icon: '🌌', fn: makeDeepSpace },
+    { id: 'tibetan',    name: 'Tibetan Bowl',     desc: 'Meditative singing bowl',   icon: '🔔', fn: makeTibetan },
+    { id: 'fireplace',  name: 'Fireplace',        desc: 'Warm crackling fire',       icon: '🔥', fn: makeFireplace },
+    { id: 'temple',     name: 'Temple Garden',    desc: 'Wind chimes & stillness',   icon: '⛩️', fn: makeTemple },
+    { id: 'underwater', name: 'Underwater',       desc: 'Submarine calm',            icon: '🌊', fn: makeUnderwater },
+    { id: 'lofi_night', name: 'Lo-Fi Night',      desc: 'Late-night study vibes',    icon: '🎹', fn: makeLofiNight },
+    { id: 'forest_dawn',name: 'Forest at Dawn',   desc: 'Birds waking up',           icon: '🌲', fn: makeForestDawn },
   ];
 
   function getCtx() {
     if (!ctx) {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
-      gainNode = ctx.createGain(); gainNode.gain.value = vol; gainNode.connect(ctx.destination);
+      gainNode = ctx.createGain(); gainNode.gain.value = vol;
+      // Subtle convolution reverb via IIR approximation
+      reverbNode = makeReverb(ctx);
+      gainNode.connect(reverbNode); reverbNode.connect(ctx.destination);
+      // Also connect dry signal
+      gainNode.connect(ctx.destination);
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
+  }
+
+  function makeReverb(c) {
+    const len = c.sampleRate * 2.2;
+    const buf = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.4);
+    }
+    const cv = c.createConvolver(); cv.buffer = buf;
+    const g = c.createGain(); g.gain.value = 0.18;
+    cv.connect(g); return g;
+  }
+
+  // Brown noise generator (shared utility)
+  function brownNoise(c, seconds = 4) {
+    const buf = c.createBuffer(1, c.sampleRate * seconds, c.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) {
+      const w = Math.random() * 2 - 1;
+      last = (last + 0.02 * w) / 1.02;
+      d[i] = last * 3.5;
+    }
+    return buf;
   }
 
   function stop() {
@@ -2616,12 +2937,9 @@ const AMB = (() => {
   }
 
   function play(trackId) {
-    const t = tracks.find(x => x.id === trackId);
-    if (!t) return;
-    if (currentTrack === trackId) { stop(); return; } // toggle off
-    stop();
-    getCtx();
-    currentTrack = trackId;
+    const t = tracks.find(x => x.id === trackId); if (!t) return;
+    if (currentTrack === trackId) { stop(); return; }
+    stop(); getCtx(); currentTrack = trackId;
     t.fn(ctx, gainNode, activeNodes);
     document.getElementById('amb-btn').classList.add('playing');
     document.querySelectorAll('.amb-track').forEach(el => el.classList.toggle('active', el.dataset.id === trackId));
@@ -2629,8 +2947,7 @@ const AMB = (() => {
 
   function setVol(v) {
     vol = v / 100;
-    if (gainNode) gainNode.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
-    // Update slider gradient
+    if (gainNode) gainNode.gain.setTargetAtTime(vol * 0.9, ctx.currentTime, 0.08);
     const sl = document.getElementById('amb-vol');
     if (sl) sl.style.background = `linear-gradient(to right,var(--g2) ${v}%,var(--bg4) ${v}%)`;
   }
@@ -2646,180 +2963,270 @@ const AMB = (() => {
     ).join('');
   }
 
-  // ── GENERATORS ──────────────────────────────────────────
-  function makeRain(c, out, nodes) {
-    // Brown noise (rain-like) via AudioWorklet fallback: use multiple filtered buffers
-    const buf = c.createBuffer(1, c.sampleRate * 3, c.sampleRate);
-    const data = buf.getChannelData(0);
-    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
-    for (let i = 0; i < data.length; i++) {
-      const w = Math.random() * 2 - 1;
-      b0=.99886*b0+w*.0555179; b1=.99332*b1+w*.0750759;
-      b2=.96900*b2+w*.1538520; b3=.86650*b3+w*.3104856;
-      b4=.55000*b4+w*.5329522; b5=-.7616*b5-w*.0168980;
-      data[i] = (b0+b1+b2+b3+b4+b5+b6+w*.5362)*0.11; b6=w*.115926;
+  // ── 1. SOFT RAIN — delicate, layered, soothing ────────────
+  function makeSoftRain(c, out, nodes) {
+    // Pink noise base (gentle, not harsh)
+    const buf = c.createBuffer(2, c.sampleRate * 5, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0;
+      for (let i = 0; i < d.length; i++) {
+        const w = Math.random() * 2 - 1;
+        b0=.99886*b0+w*.0555179; b1=.99332*b1+w*.0750759;
+        b2=.96900*b2+w*.1538520; b3=.86650*b3+w*.3104856;
+        b4=.55000*b4+w*.5329522; b5=-.7616*b5-w*.0168980;
+        d[i] = (b0+b1+b2+b3+b4+b5+w*.5362) * 0.07;
+      }
     }
-    function loop() {
-      const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
-      const filt = c.createBiquadFilter(); filt.type='highpass'; filt.frequency.value=200;
-      const g = c.createGain(); g.gain.value = 1.4;
-      src.connect(filt); filt.connect(g); g.connect(out);
-      src.start(); nodes.push(src);
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lpf = c.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 2200;
+    src.connect(lpf); lpf.connect(out); src.start(); nodes.push(src);
+    // Occasional drop plops — sine clicks at random intervals
+    function drop() {
+      const t = c.currentTime + 0.05 + Math.random() * 0.9;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(900 + Math.random()*400, t);
+      o.frequency.exponentialRampToValueAtTime(200, t + 0.08);
+      g.gain.setValueAtTime(0.025, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.11); nodes.push(o);
+      if (currentTrack === 'rain_soft') setTimeout(drop, (0.1 + Math.random() * 0.7) * 1000);
     }
-    loop();
-    // High-freq sizzle for drops
-    const siz = c.createOscillator(); siz.type='sawtooth'; siz.frequency.value=80;
-    const sf = c.createBiquadFilter(); sf.type='bandpass'; sf.frequency.value=8000; sf.Q.value=0.5;
-    const sg = c.createGain(); sg.gain.value=0.018;
-    siz.connect(sf); sf.connect(sg); sg.connect(out); siz.start(); nodes.push(siz);
+    for (let i = 0; i < 5; i++) setTimeout(drop, i * 200);
   }
 
-  function makeLofi(c, out, nodes) {
-    const bpm = 82, beat = 60/bpm;
-    // Kick drum
+  // ── 2. DEEP SPACE — cosmic pad drone ──────────────────────
+  function makeDeepSpace(c, out, nodes) {
+    // Layered detuned sine pads
+    [[55,0],[55.4,.3],[82.4,.6],[110,.9],[164.8,1.4]].forEach(([freq, delay]) => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      // Slow LFO for shimmer
+      const lfo = c.createOscillator(), lg = c.createGain();
+      lfo.type = 'sine'; lfo.frequency.value = 0.04 + Math.random() * 0.06;
+      lg.gain.value = freq * 0.003;
+      lfo.connect(lg); lg.connect(o.frequency);
+      g.gain.setValueAtTime(0, c.currentTime + delay);
+      g.gain.linearRampToValueAtTime(0.09, c.currentTime + delay + 3);
+      o.connect(g); g.connect(out); o.start(c.currentTime + delay); lfo.start();
+      nodes.push(o, lfo);
+    });
+    // Occasional shimmer — high harmonic glint
+    function glint() {
+      const t = c.currentTime + 2 + Math.random() * 8;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = 880 + Math.random() * 1320;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.04, t + 1.5);
+      g.gain.linearRampToValueAtTime(0, t + 5);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 5.1); nodes.push(o);
+      if (currentTrack === 'deep_space') setTimeout(glint, (3 + Math.random() * 9) * 1000);
+    }
+    glint();
+  }
+
+  // ── 3. TIBETAN BOWL — meditative resonance ────────────────
+  function makeTibetan(c, out, nodes) {
+    function bowl(baseFreq, strikeTime) {
+      // Fundamental + harmonics
+      [1, 2.76, 5.2, 9.1].forEach((ratio, i) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = baseFreq * ratio;
+        const att = 0.015, dec = 6 + i * 2;
+        g.gain.setValueAtTime(0, strikeTime);
+        g.gain.linearRampToValueAtTime(0.12 / (i + 1), strikeTime + att);
+        g.gain.exponentialRampToValueAtTime(0.001, strikeTime + dec);
+        o.connect(g); g.connect(out); o.start(strikeTime); o.stop(strikeTime + dec + 0.1);
+        nodes.push(o);
+      });
+    }
+    // Strike pattern: two bowls at different pitches
+    let t = c.currentTime + 0.3;
+    bowl(220, t); bowl(329.6, t + 4.5);
+    const iid = setInterval(() => {
+      t = c.currentTime + 0.1;
+      bowl(220, t); bowl(329.6, t + 5);
+    }, 12000);
+    nodes.push({ stop: () => clearInterval(iid) });
+    // Very soft brown noise for "room presence"
+    const rbuf = brownNoise(c, 4);
+    const rsrc = c.createBufferSource(); rsrc.buffer = rbuf; rsrc.loop = true;
+    const rg = c.createGain(); rg.gain.value = 0.015;
+    rsrc.connect(rg); rg.connect(out); rsrc.start(); nodes.push(rsrc);
+  }
+
+  // ── 4. FIREPLACE — warm crackling ─────────────────────────
+  function makeFireplace(c, out, nodes) {
+    // Low-pass brown noise = fire roar base
+    const buf = brownNoise(c, 5);
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lpf = c.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 700;
+    const g = c.createGain(); g.gain.value = 0.55;
+    // Slow LFO for "breathing" fire
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.15; lfo.type = 'sine';
+    const lg = c.createGain(); lg.gain.value = 0.08;
+    lfo.connect(lg); lg.connect(g.gain);
+    src.connect(lpf); lpf.connect(g); g.connect(out); src.start(); lfo.start();
+    nodes.push(src, lfo);
+    // Crackle pops — short filtered noise bursts
+    function crackle() {
+      const t = c.currentTime + Math.random() * 0.6;
+      const cb = c.createBuffer(1, c.sampleRate * 0.04, c.sampleRate);
+      const cd = cb.getChannelData(0);
+      for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1);
+      const cs = c.createBufferSource(); cs.buffer = cb;
+      const cf = c.createBiquadFilter(); cf.type = 'highpass'; cf.frequency.value = 1200;
+      const cg = c.createGain(); cg.gain.setValueAtTime(0.08 + Math.random() * 0.12, t);
+      cg.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+      cs.connect(cf); cf.connect(cg); cg.connect(out); cs.start(t); nodes.push(cs);
+      if (currentTrack === 'fireplace') setTimeout(crackle, (0.08 + Math.random() * 0.5) * 1000);
+    }
+    for (let i = 0; i < 4; i++) setTimeout(crackle, i * 300);
+  }
+
+  // ── 5. TEMPLE GARDEN — wind chimes + stillness ────────────
+  function makeTemple(c, out, nodes) {
+    // Pentatonic wind chime notes (C pentatonic)
+    const notes = [261.6, 293.7, 329.6, 392, 440, 523.3, 587.3];
+    function chime() {
+      const t = c.currentTime + Math.random() * 0.2;
+      const n = notes[~~(Math.random() * notes.length)];
+      // Two partials per chime
+      [1, 2.77].forEach((ratio, i) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = n * ratio;
+        g.gain.setValueAtTime(0.06 / (i + 1), t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 3.5 - i * 0.8);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + 3.6); nodes.push(o);
+      });
+      if (currentTrack === 'temple') setTimeout(chime, (0.8 + Math.random() * 5) * 1000);
+    }
+    chime(); chime();
+    // Gentle wind — filtered noise
+    const wb = c.createBuffer(1, c.sampleRate * 6, c.sampleRate);
+    const wd = wb.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;
+    const ws = c.createBufferSource(); ws.buffer = wb; ws.loop = true;
+    const wf = c.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 300; wf.Q.value = 0.6;
+    const wlfo = c.createOscillator(); wlfo.frequency.value = 0.08; wlfo.type = 'sine';
+    const wlg = c.createGain(); wlg.gain.value = 100;
+    wlfo.connect(wlg); wlg.connect(wf.frequency);
+    const wg = c.createGain(); wg.gain.value = 0.04;
+    ws.connect(wf); wf.connect(wg); wg.connect(out); ws.start(); wlfo.start();
+    nodes.push(ws, wlfo);
+  }
+
+  // ── 6. UNDERWATER — submarine, dreamy ─────────────────────
+  function makeUnderwater(c, out, nodes) {
+    // Very low-pass noise = deep water hum
+    const buf = c.createBuffer(1, c.sampleRate * 6, c.sampleRate);
+    const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lpf = c.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 320;
+    const g = c.createGain(); g.gain.value = 0.3;
+    src.connect(lpf); lpf.connect(g); g.connect(out); src.start(); nodes.push(src);
+    // Slow bubbles — rising sine sweeps
+    function bubble() {
+      const t = c.currentTime + Math.random() * 2;
+      const o = c.createOscillator(), bg = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(120 + Math.random() * 80, t);
+      o.frequency.exponentialRampToValueAtTime(400 + Math.random() * 200, t + 0.8);
+      bg.gain.setValueAtTime(0.03, t); bg.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+      o.connect(bg); bg.connect(out); o.start(t); o.stop(t + 0.91); nodes.push(o);
+      if (currentTrack === 'underwater') setTimeout(bubble, (0.5 + Math.random() * 3) * 1000);
+    }
+    for (let i = 0; i < 3; i++) setTimeout(bubble, i * 700);
+    // Deep resonant drone
+    const drone = c.createOscillator(), dg = c.createGain();
+    drone.type = 'sine'; drone.frequency.value = 55;
+    dg.gain.setValueAtTime(0, c.currentTime); dg.gain.linearRampToValueAtTime(0.07, c.currentTime + 3);
+    drone.connect(dg); dg.connect(out); drone.start(); nodes.push(drone);
+  }
+
+  // ── 7. LO-FI NIGHT — minimal, late-night, warm ────────────
+  function makeLofiNight(c, out, nodes) {
+    const bpm = 72, beat = 60 / bpm;
+    // Very soft kick
     function kick(t) {
       const o = c.createOscillator(), g = c.createGain();
-      o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(40,t+.12);
-      g.gain.setValueAtTime(.9,t); g.gain.exponentialRampToValueAtTime(.001,t+.25);
-      o.connect(g); g.connect(out); o.start(t); o.stop(t+.26); nodes.push(o);
+      o.frequency.setValueAtTime(100, t); o.frequency.exponentialRampToValueAtTime(38, t + .14);
+      g.gain.setValueAtTime(.5, t); g.gain.exponentialRampToValueAtTime(.001, t + .3);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + .31); nodes.push(o);
     }
-    // Snare
+    // Soft snare
     function snare(t) {
-      const buf=c.createBuffer(1,c.sampleRate*.18,c.sampleRate);
-      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
-      const src=c.createBufferSource(); src.buffer=buf;
-      const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=1800;
-      const g=c.createGain(); g.gain.setValueAtTime(.38,t); g.gain.exponentialRampToValueAtTime(.001,t+.18);
-      src.connect(f); f.connect(g); g.connect(out); src.start(t); nodes.push(src);
+      const nb = c.createBuffer(1, c.sampleRate * .15, c.sampleRate);
+      const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      const ns = c.createBufferSource(); ns.buffer = nb;
+      const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 2500; nf.Q.value = 1.2;
+      const ng = c.createGain(); ng.gain.setValueAtTime(.18, t); ng.gain.exponentialRampToValueAtTime(.001, t + .15);
+      ns.connect(nf); nf.connect(ng); ng.connect(out); ns.start(t); nodes.push(ns);
     }
-    // Hi-hat
-    function hat(t,vol=.13) {
-      const buf=c.createBuffer(1,c.sampleRate*.06,c.sampleRate);
-      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
-      const src=c.createBufferSource(); src.buffer=buf;
-      const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
-      const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+.06);
-      src.connect(f); f.connect(g); g.connect(out); src.start(t); nodes.push(src);
+    // Rhodes-like chord
+    function chord(t, freqs) {
+      freqs.forEach(f => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(.07, t); g.gain.exponentialRampToValueAtTime(.001, t + beat * 3.8);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + beat * 4); nodes.push(o);
+      });
     }
-    // Bass note
-    function bass(t,freq) {
-      const o=c.createOscillator(),g=c.createGain();
-      o.type='triangle'; o.frequency.value=freq;
-      g.gain.setValueAtTime(.22,t); g.gain.exponentialRampToValueAtTime(.001,t+beat*.9);
-      o.connect(g); g.connect(out); o.start(t); o.stop(t+beat); nodes.push(o);
+    const chords = [[196,247,294,370],[174.6,220,261.6,329.6],[164.8,207.7,246.9,311],[184,232,277,349]];
+    let t = c.currentTime + .1, ci = 0;
+    function sched() {
+      kick(t); kick(t + beat * 2);
+      snare(t + beat); snare(t + beat * 3);
+      chord(t, chords[ci % chords.length]); ci++;
+      t += beat * 4;
     }
-    const bassline=[55,55,49,52,55,55,49,46];
-    let t = c.currentTime + 0.1;
-    let step = 0;
-    function scheduleBeat() {
-      const b4 = beat * 4;
-      kick(t); kick(t+beat*2);
-      snare(t+beat); snare(t+beat*3);
-      for(let i=0;i<8;i++) hat(t+beat*i*.5, i%2===0?.15:.09);
-      for(let i=0;i<4;i++) bass(t+beat*i, bassline[(step*4+i)%bassline.length]);
-      step=(step+1)%2; t+=b4;
-    }
-    scheduleBeat(); scheduleBeat(); // prime 2 bars ahead
-    const tid = setInterval(()=>{if(t-c.currentTime<beat*8) scheduleBeat();},beat*2000);
-    nodes.push({ stop:()=>clearInterval(tid) });
-    // Warm vinyl crackle
-    const crk=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
-    const cd=crk.getChannelData(0);
-    for(let i=0;i<cd.length;i++) cd[i]=Math.random()<.002?(Math.random()*2-1)*0.6:0;
-    const csrc=c.createBufferSource(); csrc.buffer=crk; csrc.loop=true;
-    const cg=c.createGain(); cg.gain.value=0.06;
-    csrc.connect(cg); cg.connect(out); csrc.start(); nodes.push(csrc);
+    sched(); sched();
+    const iid = setInterval(() => { if (t - c.currentTime < beat * 8) sched(); }, beat * 1500);
+    nodes.push({ stop: () => clearInterval(iid) });
+    // Vinyl surface noise
+    const vb = c.createBuffer(1, c.sampleRate * 3, c.sampleRate);
+    const vd = vb.getChannelData(0);
+    for (let i = 0; i < vd.length; i++) vd[i] = Math.random() < .003 ? (Math.random() * 2 - 1) * .4 : 0;
+    const vs = c.createBufferSource(); vs.buffer = vb; vs.loop = true;
+    const vg = c.createGain(); vg.gain.value = .05;
+    vs.connect(vg); vg.connect(out); vs.start(); nodes.push(vs);
   }
 
-  function makeCafe(c, out, nodes) {
-    // Low chatter hum: multiple detuned band-pass noises
-    [280,420,600,900,1400].forEach((freq,i)=>{
-      const buf=c.createBuffer(1,c.sampleRate*4,c.sampleRate);
-      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=Math.random()*2-1;
-      const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
-      const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=freq; f.Q.value=1.5+i;
-      const g=c.createGain(); g.gain.value=0.045/(i+1);
-      src.connect(f); f.connect(g); g.connect(out); src.start(Math.random()*.5); nodes.push(src);
-    });
-    // Occasional cup clink: short sine click
-    function clink() {
-      const t=c.currentTime+Math.random()*8+2;
-      const o=c.createOscillator(),g=c.createGain();
-      o.frequency.value=1200+Math.random()*400; o.type='sine';
-      g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.001,t+.3);
-      o.connect(g); g.connect(out); o.start(t); o.stop(t+.31); nodes.push(o);
-      if(currentTrack==='cafe') setTimeout(clink,(2+Math.random()*9)*1000);
+  // ── 8. FOREST AT DAWN — birdsong + morning air ────────────
+  function makeForestDawn(c, out, nodes) {
+    // Morning air — gentle filtered noise
+    const ab = c.createBuffer(1, c.sampleRate * 5, c.sampleRate);
+    const ad = ab.getChannelData(0); for (let i = 0; i < ad.length; i++) ad[i] = Math.random() * 2 - 1;
+    const as_ = c.createBufferSource(); as_.buffer = ab; as_.loop = true;
+    const af = c.createBiquadFilter(); af.type = 'bandpass'; af.frequency.value = 500; af.Q.value = 0.5;
+    const ag = c.createGain(); ag.gain.value = 0.04;
+    as_.connect(af); af.connect(ag); ag.connect(out); as_.start(); nodes.push(as_);
+    // Birds — varied pitch patterns
+    const birdPatterns = [[880,1100,990],[1320,1560,1210],[660,880,770,990],[1047,1319,1175]];
+    function bird() {
+      const t0 = c.currentTime + .1;
+      const pattern = birdPatterns[~~(Math.random() * birdPatterns.length)];
+      pattern.forEach((freq, i) => {
+        const t = t0 + i * 0.12;
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(freq, t);
+        o.frequency.linearRampToValueAtTime(freq * 1.15, t + 0.05);
+        o.frequency.linearRampToValueAtTime(freq * 0.95, t + 0.1);
+        g.gain.setValueAtTime(0.04, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.13); nodes.push(o);
+      });
+      if (currentTrack === 'forest_dawn') setTimeout(bird, (1.5 + Math.random() * 6) * 1000);
     }
-    clink();
-    // Gentle espresso machine hiss
-    const hissBuf=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
-    const hd=hissBuf.getChannelData(0); for(let i=0;i<hd.length;i++) hd[i]=Math.random()*2-1;
-    const hs=c.createBufferSource(); hs.buffer=hissBuf; hs.loop=true;
-    const hf=c.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=4000;
-    const hg=c.createGain(); hg.gain.value=0.025;
-    hs.connect(hf); hf.connect(hg); hg.connect(out); hs.start(); nodes.push(hs);
-  }
-
-  function makeForest(c, out, nodes) {
-    // Wind: slow LFO on filtered noise
-    const buf=c.createBuffer(1,c.sampleRate*4,c.sampleRate);
-    const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
-    const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=400; f.Q.value=0.8;
-    const lfo=c.createOscillator(); lfo.frequency.value=0.12; lfo.type='sine';
-    const lfog=c.createGain(); lfog.gain.value=180;
-    lfo.connect(lfog); lfog.connect(f.frequency);
-    const g=c.createGain(); g.gain.value=0.28;
-    src.connect(f); f.connect(g); g.connect(out); src.start(); lfo.start(); nodes.push(src,lfo);
-    // Bird chirps
-    function chirp() {
-      const t=c.currentTime+Math.random()*6+1;
-      const freq=2000+Math.random()*1500;
-      const o=c.createOscillator(),g2=c.createGain();
-      o.type='sine'; o.frequency.setValueAtTime(freq,t);
-      o.frequency.linearRampToValueAtTime(freq*1.3,t+.06);
-      o.frequency.linearRampToValueAtTime(freq*.9,t+.14);
-      g2.gain.setValueAtTime(.04,t); g2.gain.exponentialRampToValueAtTime(.001,t+.2);
-      o.connect(g2); g2.connect(out); o.start(t); o.stop(t+.22); nodes.push(o);
-      if(currentTrack==='forest') setTimeout(chirp,(1+Math.random()*5)*1000);
+    bird(); bird(); setTimeout(bird, 800);
+    // Distant cuckoo-like call
+    function cuckoo() {
+      const t = c.currentTime + .1;
+      [[523, 0],[415, .3]].forEach(([f, delay]) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.025, t + delay); g.gain.exponentialRampToValueAtTime(.001, t + delay + .28);
+        o.connect(g); g.connect(out); o.start(t + delay); o.stop(t + delay + .3); nodes.push(o);
+      });
+      if (currentTrack === 'forest_dawn') setTimeout(cuckoo, (8 + Math.random() * 15) * 1000);
     }
-    chirp(); chirp();
-  }
-
-  function makeOcean(c, out, nodes) {
-    // Two detuned noise bands for wave rhythm
-    [1,2].forEach(i=>{
-      const buf=c.createBuffer(1,c.sampleRate*8,c.sampleRate);
-      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=Math.random()*2-1;
-      const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
-      const f=c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=600;
-      const lfo=c.createOscillator(); lfo.frequency.value=.09+i*.04; lfo.type='sine';
-      const lg=c.createGain(); lg.gain.value=.35;
-      lfo.connect(lg); lg.connect(f.frequency);
-      const g=c.createGain(); g.gain.value=.22;
-      src.connect(f); f.connect(g); g.connect(out);
-      src.start(i*1.5); lfo.start(); nodes.push(src,lfo);
-    });
-    // Gentle splash pops
-    function splash() {
-      const t=c.currentTime+4+Math.random()*4;
-      const buf=c.createBuffer(1,c.sampleRate*.5,c.sampleRate);
-      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-      const src=c.createBufferSource(); src.buffer=buf;
-      const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1200; f.Q.value=1;
-      const g=c.createGain(); g.gain.setValueAtTime(.04,t); g.gain.exponentialRampToValueAtTime(.001,t+.5);
-      src.connect(f); f.connect(g); g.connect(out); src.start(t); nodes.push(src);
-      if(currentTrack==='ocean') setTimeout(splash,(3+Math.random()*5)*1000);
-    }
-    splash();
-  }
-
-  function makeWhite(c, out, nodes) {
-    const buf=c.createBuffer(1,c.sampleRate*2,c.sampleRate);
-    const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    const src=c.createBufferSource(); src.buffer=buf; src.loop=true;
-    const g=c.createGain(); g.gain.value=.18;
-    src.connect(g); g.connect(out); src.start(); nodes.push(src);
+    setTimeout(cuckoo, 3000);
   }
 
   return { play, stop, setVol, buildUI, tracks, get current() { return currentTrack; } };
@@ -2839,7 +3246,6 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#amb-btn') && !e.target.closest('.amb-panel'))
     document.getElementById('amb-panel')?.classList.remove('open');
 });
-
 
 function ar(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
 function ft(d) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
