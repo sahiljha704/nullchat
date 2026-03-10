@@ -1122,6 +1122,15 @@ body{font-family:var(--font);background:var(--bg0);color:var(--tx);height:100dvh
         <div class="att-item" onclick="startVoice()"><div class="att-ico" style="background:rgba(255,23,68,.12)">🎙️</div><div class="att-lbl">Voice</div></div>
       </div>
 
+      <!-- Whisper bar (shown when composing a whisper) -->
+      <div class="whisper-bar" id="whisper-bar">
+        <div class="whisper-to">
+          <svg viewBox="0 0 24 24"><path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12s4.5 10 10 10z"/><path d="M8 9h8M8 13h5"/></svg>
+          Whisper to <span id="whisper-to-name" style="color:rgba(210,170,255,.95)"></span>
+        </div>
+        <button class="whisper-dismiss" onclick="clearWhisper()" title="Cancel whisper">✕</button>
+      </div>
+
       <!-- Reply quote bar (shown above input when replying) -->
       <div class="reply-bar" id="reply-bar">
         <div style="font-size:.8rem">↩️</div>
@@ -1816,6 +1825,14 @@ async function onSigMsg(msg) {
   else if (t === 'kick') { handleKick(d); }
   else if (t === 'react') { applyReaction(d); }
   else if (t === 'poll_vote') { applyPollVote(d); }
+  else if (t === 'whisper') {
+    if (d.to !== S.myId) return; // not for us
+    const dec = await E2E.decrypt(d.payload, d.from);
+    if (!dec) return;
+    const m = S.members[d.from] || { name: dec.sn || '?', avatar: dec.sa || '👤' };
+    addMsg({ dir: 'in', ...dec, senderName: m.name, from: d.from });
+    try { navigator.vibrate?.([8, 20, 8]); } catch {}
+  }
   else if (t === 'msg') {
     // Relay fallback message — encrypted with roomKey
     const dec = await E2E.decrypt(d.payload, d.from);
@@ -1853,6 +1870,15 @@ async function onRTCMsg(pid, msg) {
   else if (t === 'typ') { showTyp(msg.v); }
   else if (t === 'react') { applyReaction(msg); }
   else if (t === 'poll_vote') { applyPollVote(msg); }
+  else if (t === 'whisper') {
+    // Only the intended recipient receives this type
+    if (msg.to && msg.to !== S.myId) return; // extra guard
+    const dec = await E2E.decrypt(msg.payload, pid);
+    if (!dec) return;
+    const m = S.members[pid] || { name: dec.sn || '?', avatar: dec.sa || '👤' };
+    addMsg({ dir: 'in', ...dec, senderName: m.name, from: pid });
+    try { navigator.vibrate?.([8, 20, 8]); } catch {}
+  }
 }
 
 function onPeerConn(pid) {
@@ -2064,15 +2090,29 @@ function updMbrs() {
       </div>
     </div>` +
     Object.entries(S.members).map(([id, m]) =>
-      `<div class="mbr-item">
+      `<div class="mbr-item" id="mbr-${id}">
         <div class="mbr-emo-wrap peer"><span>${m.avatar || '👤'}</span><div class="typ-ring"></div></div>
         <div class="mbr-info">
           <div class="mbr-name">${esc(m.name)}${id === S.adminId ? '<span class="adm-tag">Admin</span>' : ''}</div>
           ${E2E.fp(id) ? `<div class="mbr-fp">🔐 ${E2E.fp(id)}</div>` : ''}
+          <div class="mbr-whisper-hint">Hold to whisper 🤫</div>
         </div>
         ${isAdmin && id !== S.myId ? `<button class="kick-btn" onclick="promptKick('${id}','${esc(m.name)}')">Remove</button>` : ''}
       </div>`
     ).join('');
+  // Wire long-press whisper on each peer item
+  Object.entries(S.members).forEach(([id, m]) => {
+    const el = document.getElementById('mbr-' + id);
+    if (!el) return;
+    let lpT = null;
+    el.addEventListener('pointerdown', () => {
+      el.classList.add('lp-active');
+      lpT = setTimeout(() => { el.classList.remove('lp-active'); startWhisper(id, m.name); }, 500);
+    });
+    el.addEventListener('pointerup',   () => { clearTimeout(lpT); el.classList.remove('lp-active'); });
+    el.addEventListener('pointerleave',() => { clearTimeout(lpT); el.classList.remove('lp-active'); });
+    el.addEventListener('contextmenu', e => { e.preventDefault(); startWhisper(id, m.name); });
+  });
 }
 function toggleMbrs() { document.getElementById('mbr-panel').classList.toggle('open'); }
 function promptKick(id, name) { S.pendingKickId = id; document.getElementById('kick-msg').textContent = `Remove "${name}" from this room?`; document.getElementById('kick-modal').classList.add('open'); }
@@ -2139,6 +2179,69 @@ function jumpToMsg(msgId) {
 }
 
 // ────────────────────────────────────────────────────────────
+//  WHISPER STATE
+// ────────────────────────────────────────────────────────────
+let whisperTo = null; // { id, name }
+
+function startWhisper(peerId, peerName) {
+  whisperTo = { id: peerId, name: peerName };
+  document.getElementById('whisper-to-name').textContent = peerName;
+  document.getElementById('whisper-bar').classList.add('show');
+  // Close members panel, focus input
+  document.getElementById('mbr-panel').classList.remove('open');
+  document.getElementById('msg-inp').focus();
+  try { navigator.vibrate?.([12, 40, 12]); } catch {}
+  toast(`🤫 Whisper mode — only ${peerName} will see this`);
+}
+
+function clearWhisper() {
+  whisperTo = null;
+  document.getElementById('whisper-bar').classList.remove('show');
+}
+
+async function sendWhisper(txt) {
+  if (!whisperTo || !txt) return;
+  const toPid = whisperTo.id;
+  const toName = whisperTo.name;
+  const now = new Date();
+  const msgId = 'msg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const inner = {
+    msgId, from: S.myId, sn: S.name, sa: S.avatar,
+    msgType: 'whisper', text: txt,
+    whisperTo: toPid, whisperToName: toName,
+    time: ft(now), date: fd(now)
+  };
+
+  // Send the real message ONLY to the whisper target — peer-key encrypted
+  if (RTC.isOpen(toPid)) {
+    const payload = await E2E.encryptForPeer(inner, toPid);
+    RTC.send(toPid, { type: 'whisper', from: S.myId, payload });
+  } else if (sigCh) {
+    // Relay path: encrypt with peer key if available, otherwise room key
+    const payload = await E2E.encryptForPeer(inner, toPid);
+    sigCh.publish('whisper', { from: S.myId, to: toPid, payload });
+  }
+
+  // Broadcast a GHOST to all OTHER peers (no content — just "[whisper sent]")
+  const ghostInner = { msgId: msgId + '_ghost', from: S.myId, sn: S.name, sa: S.avatar, msgType: 'whisper_ghost', whisperToName: toName, time: ft(now), date: fd(now) };
+  const otherPeers = Object.keys(S.members).filter(id => id !== toPid);
+  for (const pid of otherPeers) {
+    if (RTC.isOpen(pid)) {
+      const payload = await E2E.encryptForPeer(ghostInner, pid);
+      RTC.send(pid, { type: 'msg', from: S.myId, payload });
+    } else if (sigCh) {
+      const payload = await E2E.encryptForRelay(ghostInner);
+      sigCh.publish('msg', { from: S.myId, payload });
+    }
+  }
+
+  // Show in our own chat as sent whisper
+  addMsg({ dir: 'out', senderName: S.name, ...inner });
+  clearWhisper();
+  SFX.send();
+}
+
+// ────────────────────────────────────────────────────────────
 //  MESSAGING
 // ────────────────────────────────────────────────────────────
 async function sendMsg() {
@@ -2146,6 +2249,8 @@ async function sendMsg() {
   document.getElementById('msg-inp').value = '';
   document.getElementById('msg-inp').style.height = 'auto';
   updSendBtn();
+  // Route to whisper if in whisper mode
+  if (whisperTo) { await sendWhisper(txt); return; }
   const now = new Date();
   const inner = {
     msgId: 'msg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -2229,13 +2334,23 @@ function renderMsgs() {
       const d = document.createElement('div'); d.className = 'sys-msg'; d.textContent = m.text;
       c.insertBefore(d, typ); return;
     }
+    // Whisper ghost — shown to non-recipients
+    if (m.msgType === 'whisper_ghost') {
+      const d = document.createElement('div'); d.className = 'whisper-ghost';
+      const nm = m.senderName || m.sn || '?';
+      d.innerHTML = `🤫 ${esc(nm)} whispered to ${esc(m.whisperToName || 'someone')}`;
+      c.insertBefore(d, typ); return;
+    }
     if (m.date && m.date !== lastDate) {
       lastDate = m.date;
       const d = document.createElement('div'); d.className = 'date-div';
       d.innerHTML = `<span>${m.date}</span>`; c.insertBefore(d, typ);
     }
     const row = document.createElement('div');
-    row.className = `mrow ${m.dir}`;
+    // Determine row classes
+    let rowClass = `mrow ${m.dir}`;
+    if (m.msgType === 'whisper') rowClass += ` whisper-${m.dir}`;
+    row.className = rowClass;
     if (m.msgId) row.id = 'm-' + m.msgId;
 
     const multi = Object.keys(S.members).length > 1;
@@ -2253,6 +2368,11 @@ function renderMsgs() {
 
     let body = '';
     if (mt === 'text') body = `${sn}${quoteHtml}<div class="bbl-txt">${escnl(m.text)}</div>`;
+    else if (mt === 'whisper') {
+      const whisperIcon = `<svg viewBox="0 0 24 24"><path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12s4.5 10 10 10z"/><path d="M8 9h8M8 13h5"/></svg>`;
+      const toLabel = m.dir === 'out' ? `to ${esc(m.whisperToName || '?')}` : `from ${esc(m.senderName || '?')}`;
+      body = `${sn}<div class="whisper-tag">${whisperIcon} Whisper ${toLabel}</div><div class="bbl-txt">${escnl(m.text)}</div>`;
+    }
     else if (mt === 'image') body = `${sn}${quoteHtml}<img class="img-bbl" src="${m.data}" onclick="openLB('img','${m.data}')"/>`;
     else if (mt === 'video') body = `${sn}${quoteHtml}<video class="vid-bbl" src="${m.data}" controls playsinline></video>`;
     else if (mt === 'audio') body = sn + quoteHtml + mkAud(m);
