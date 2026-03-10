@@ -5,11 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NullChat</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script>
-  window.NULLCHAT_SERVER = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
-    ? 'http://localhost:3000'
-    : 'https://YOUR-SERVER-URL.railway.app'; // ← CHANGE THIS after deploying
-</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -521,8 +516,11 @@ body{font-family:'Inter',sans-serif;background:#000;height:100vh;overflow:hidden
 
 <div class="toast" id="toastEl"></div>
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
 <script>
+// ─── ABLY API KEY ─────────────────────────────
+const ABLY_KEY = '2Oa3Ug.lV0WJg:PBBveq0tADR0r2JNMB2Yhievep_mSmNG7bJkOdyHvYI';
+
 // ══════════════════════════════════════════════
 // EMOJI DATA — Full WhatsApp-style categories
 // ══════════════════════════════════════════════
@@ -555,22 +553,26 @@ const THS=[
 // ══════════════════════════════════════════════
 const S={
   avatar:AVS[0],selAv:AVS[0],name:'',room:'',theme:'d',
-  setupMode:'create',
-  peers:{}, // peerId → {name, avatar, conn, channel}
-  mySocketId:null,
+  myId: '',           // unique ID for this user in this session
+  peers:{},           // peerId → {name,avatar,conn,channel}
   messages:[],rooms:[],
   connected:false,
   recentEmojis:[],
-  isRecording:false,
-  mediaRecorder:null,audioChunks:[],
+  isRecording:false,mediaRecorder:null,audioChunks:[],
   typingTimer:null,isTyping:false,
 };
 
-let socket=null;
+// Ably + WebRTC
+let ablyClient=null;
+let sigChannel=null; // the Ably channel for this room (signaling only)
+let appBooted=false;
+
 const ICE={iceServers:[
   {urls:'stun:stun.l.google.com:19302'},
   {urls:'stun:stun1.l.google.com:19302'},
   {urls:'stun:stun2.l.google.com:19302'},
+  {urls:'stun:stun3.l.google.com:19302'},
+  {urls:'stun:stun4.l.google.com:19302'},
 ]};
 
 // ══════════════════════════════════════════════
@@ -584,20 +586,17 @@ setTimeout(()=>{
   setTimeout(()=>{l.style.display='none';show('home');},500);
 },3200);
 
-// File input listeners
 document.getElementById('fi-img').onchange=e=>handleFile(e.target.files[0],'image');
 document.getElementById('fi-vid').onchange=e=>handleFile(e.target.files[0],'video');
 document.getElementById('fi-doc').onchange=e=>handleFile(e.target.files[0],'document');
 document.getElementById('fi-any').onchange=e=>handleFile(e.target.files[0],'file');
 
-// Show/hide send vs mic button
 document.getElementById('mi').addEventListener('input',()=>{
-  const hasText=document.getElementById('mi').value.trim().length>0;
-  document.getElementById('sbt').style.display=hasText?'flex':'none';
-  document.getElementById('vcbt').style.display=hasText?'none':'flex';
+  const has=document.getElementById('mi').value.trim().length>0;
+  document.getElementById('sbt').style.display=has?'flex':'none';
+  document.getElementById('vcbt').style.display=has?'none':'flex';
 });
 
-// Close overlays on outside click
 document.addEventListener('click',e=>{
   if(!e.target.closest('#attbtn')&&!e.target.closest('.att-menu'))
     document.getElementById('attmenu').classList.remove('open');
@@ -618,8 +617,8 @@ function goSetup(mode){
   S.setupMode=mode;
   document.getElementById('stl').textContent=mode==='create'?'Create a Room':'Join a Room';
   document.getElementById('ssb').textContent=mode==='create'
-    ?'Set your identity and generate a room code to share with up to 100 people.'
-    :'Enter your identity and the room code your friend shared.';
+    ?'Generate a room code and share it with up to 100 people.'
+    :'Enter the room code your friend shared with you.';
   document.getElementById('scta').textContent=mode==='create'?'Create Room & Connect':'Join Room';
   document.getElementById('gbt').style.display=mode==='join'?'none':'';
   if(mode==='create') genCode(); else document.getElementById('sr').value='';
@@ -627,7 +626,7 @@ function goSetup(mode){
 }
 
 // ══════════════════════════════════════════════
-// SETUP
+// SETUP UI
 // ══════════════════════════════════════════════
 function buildSetupUI(){
   document.getElementById('avg').innerHTML=AVS.map((a,i)=>
@@ -637,8 +636,8 @@ function buildSetupUI(){
 }
 
 function pAv(el,av,ctx){
-  const g=ctx==='s'?'#avg .av':ctx==='p'?'#pavg .av':'#avg .av';
-  document.querySelectorAll(g).forEach(a=>a.classList.remove('sel'));
+  const sel=ctx==='s'?'#avg .av':'#pavg .av';
+  document.querySelectorAll(sel).forEach(a=>a.classList.remove('sel'));
   el.classList.add('sel');
   if(ctx==='s') S.selAv=av;
   else{S.avatar=av;document.getElementById('mav').textContent=av;document.getElementById('pab').textContent=av;}
@@ -653,125 +652,238 @@ function genCode(){
 }
 
 // ══════════════════════════════════════════════
-// CONNECT
+// CONNECT — using Ably for signaling, WebRTC for messages
 // ══════════════════════════════════════════════
 function connectRoom(){
   const name=document.getElementById('sn').value.trim();
   const room=document.getElementById('sr').value.trim().toUpperCase();
   if(!name){toast('Enter your name');return;}
   if(!room){toast('Enter a room code');return;}
-  S.avatar=S.selAv;S.name=name;S.room=room;
+  S.avatar=S.selAv; S.name=name; S.room=room;
+  S.myId='usr_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+
+  // Show connecting screen
   document.getElementById('cav').textContent=S.avatar;
   document.getElementById('ccode').textContent=room;
-  document.getElementById('ctit').textContent=S.setupMode==='create'?'Waiting for people to join...':'Connecting...';
-  document.getElementById('cstat').textContent=S.setupMode==='create'?'Share the code below':'Looking for room...';
-  document.getElementById('csh').textContent=S.setupMode==='create'
-    ?`Share "${room}" with friends. Anyone who enters it on NullChat will join instantly.`
-    :`Connecting to room "${room}"...`;
+  document.getElementById('ctit').textContent='Connecting to Ably...';
+  document.getElementById('cstat').textContent='Setting up secure channel...';
+  document.getElementById('csh').textContent=`Share code "${room}" with friends so they can join.`;
   show('connecting');
-  initSocket();
+
+  initAbly();
 }
 
-function initSocket(){
-  if(socket) socket.disconnect();
-  socket=io(window.NULLCHAT_SERVER,{transports:['websocket','polling']});
+async function initAbly(){
+  try{
+    // Connect to Ably
+    ablyClient=new Ably.Realtime({key:ABLY_KEY,clientId:S.myId});
 
-  socket.on('connect',()=>{
-    S.mySocketId=socket.id;
-    socket.emit('join-room',{roomCode:S.room,userName:S.name,userAvatar:S.avatar});
-  });
-
-  socket.on('connect_error',()=>{toast('Cannot reach server. Is it running?');show('setup');});
-
-  socket.on('joined-room',({memberCount,existingPeers})=>{
-    // Connect to everyone already in the room
-    existingPeers.forEach(peer=>{
-      initPeerConn(peer.id,peer.name,peer.avatar,true); // true = we are initiator
+    ablyClient.connection.on('connected',()=>{
+      console.log('✅ Ably connected. My ID:',S.myId);
+      joinRoom();
     });
-    if(existingPeers.length===0 && S.setupMode==='create'){
-      // First person in room — boot app and wait
-      bootApp();
-    }
-  });
 
-  socket.on('peer-joined',({peerId,peerName,peerAvatar})=>{
-    // Someone new joined — they'll send us an offer
-    S.peers[peerId]={name:peerName,avatar:peerAvatar,conn:null,channel:null};
-    toast(`${peerAvatar} ${peerName} joined`);
-    updateRoomHeader();
-    updateMembersList();
-  });
+    ablyClient.connection.on('failed',(err)=>{
+      console.error('Ably connection failed:',err);
+      toast('Connection failed. Check your internet.');
+      show('setup');
+    });
 
-  socket.on('webrtc-offer',async({offer,fromId,fromName,fromAvatar})=>{
-    if(!S.peers[fromId]) S.peers[fromId]={name:fromName,avatar:fromAvatar,conn:null,channel:null};
-    const pc=createPC(fromId);
-    S.peers[fromId].conn=pc;
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer=await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('webrtc-answer',{answer,targetId:fromId});
-  });
-
-  socket.on('webrtc-answer',async({answer,fromId})=>{
-    const peer=S.peers[fromId];
-    if(peer&&peer.conn) await peer.conn.setRemoteDescription(new RTCSessionDescription(answer));
-  });
-
-  socket.on('ice-candidate',async({candidate,fromId})=>{
-    const peer=S.peers[fromId];
-    if(peer&&peer.conn) try{await peer.conn.addIceCandidate(new RTCIceCandidate(candidate));}catch(e){}
-  });
-
-  socket.on('peer-left',({peerId,peerName})=>{
-    const peer=S.peers[peerId];
-    toast(`${peer?.avatar||'👤'} ${peerName} left`);
-    if(peer){if(peer.channel)peer.channel.close();if(peer.conn)peer.conn.close();}
-    delete S.peers[peerId];
-    addSys(`${peerName} left the chat`);
-    updateRoomHeader();
-    updateMembersList();
-  });
+  }catch(e){
+    console.error('Ably init error:',e);
+    toast('Failed to connect. Try again.');
+    show('setup');
+  }
 }
 
-function initPeerConn(peerId,peerName,peerAvatar,isInitiator){
-  S.peers[peerId]={name:peerName,avatar:peerAvatar,conn:null,channel:null};
+function joinRoom(){
+  // Subscribe to the room's signaling channel
+  sigChannel=ablyClient.channels.get('nullchat-room-'+S.room);
+
+  // Listen for signaling messages from other peers
+  sigChannel.subscribe((msg)=>{
+    const d=msg.data;
+    // Ignore our own messages
+    if(d.from===S.myId) return;
+    handleSignal(d);
+  });
+
+  // Announce our presence to the room
+  // This tells everyone we just joined
+  sigChannel.publish('signal',{
+    type:'join',
+    from:S.myId,
+    name:S.name,
+    avatar:S.avatar,
+  });
+
+  // Boot the app — we're in the room now
+  document.getElementById('ctit').textContent='Joined! Waiting for peers...';
+  document.getElementById('cstat').textContent='Share the code below';
+  bootApp();
+
+  console.log('Joined room:',S.room);
+}
+
+// ══════════════════════════════════════════════
+// SIGNALING — Ably passes WebRTC handshake data
+// ══════════════════════════════════════════════
+function handleSignal(d){
+  console.log('Signal received:',d.type,'from',d.name||d.from);
+
+  if(d.type==='join'){
+    // Someone new joined — we send them an offer
+    if(!S.peers[d.from]){
+      S.peers[d.from]={name:d.name,avatar:d.avatar,conn:null,channel:null};
+      toast(`${d.avatar} ${d.name} joined`);
+      updateRoomHeader();
+      updateMembersList();
+    }
+    makeOffer(d.from);
+  }
+  else if(d.type==='offer' && d.to===S.myId){
+    // Got an offer addressed to us
+    handleOffer(d);
+  }
+  else if(d.type==='answer' && d.to===S.myId){
+    // Got an answer addressed to us
+    handleAnswer(d);
+  }
+  else if(d.type==='ice' && d.to===S.myId){
+    // Got an ICE candidate addressed to us
+    handleIce(d);
+  }
+  else if(d.type==='leave'){
+    handlePeerLeft(d.from,d.name,d.avatar);
+  }
+}
+
+function signal(data){
+  // Send a signaling message through Ably
+  if(sigChannel) sigChannel.publish('signal',{...data,from:S.myId});
+}
+
+// ══════════════════════════════════════════════
+// WebRTC — REAL P2P after Ably handshake
+// ══════════════════════════════════════════════
+async function makeOffer(peerId){
+  console.log('Making offer to',S.peers[peerId]?.name);
   const pc=createPC(peerId);
   S.peers[peerId].conn=pc;
-  if(isInitiator){
-    const ch=pc.createDataChannel('nc',{ordered:true});
-    S.peers[peerId].channel=ch;
-    setupChannel(ch,peerId);
-    pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>{
-      socket.emit('webrtc-offer',{offer:pc.localDescription,targetId:peerId});
-    });
+
+  // Create data channel before offer
+  const ch=pc.createDataChannel('nc',{ordered:true});
+  S.peers[peerId].channel=ch;
+  setupChannel(ch,peerId);
+
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  signal({type:'offer',to:peerId,offer:pc.localDescription,
+    name:S.name,avatar:S.avatar});
+}
+
+async function handleOffer(d){
+  const peerId=d.from;
+  if(!S.peers[peerId]){
+    S.peers[peerId]={name:d.name,avatar:d.avatar,conn:null,channel:null};
   }
+  const pc=createPC(peerId);
+  S.peers[peerId].conn=pc;
+
+  await pc.setRemoteDescription(new RTCSessionDescription(d.offer));
+  const answer=await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  signal({type:'answer',to:peerId,answer:pc.localDescription,
+    name:S.name,avatar:S.avatar});
+}
+
+async function handleAnswer(d){
+  const peer=S.peers[d.from];
+  if(peer&&peer.conn){
+    try{
+      await peer.conn.setRemoteDescription(new RTCSessionDescription(d.answer));
+    }catch(e){console.error('setRemoteDescription error:',e);}
+  }
+}
+
+async function handleIce(d){
+  const peer=S.peers[d.from];
+  if(peer&&peer.conn&&d.candidate){
+    try{
+      await peer.conn.addIceCandidate(new RTCIceCandidate(d.candidate));
+    }catch(e){}
+  }
+}
+
+function handlePeerLeft(peerId,peerName,peerAvatar){
+  const peer=S.peers[peerId];
+  if(peer){
+    if(peer.channel) try{peer.channel.close();}catch(e){}
+    if(peer.conn) try{peer.conn.close();}catch(e){}
+  }
+  delete S.peers[peerId];
+  toast(`${peerAvatar||'👤'} ${peerName||'Someone'} left`);
+  addSys(`👋 ${peerName||'Someone'} left the chat`);
+  updateRoomHeader();
+  updateMembersList();
 }
 
 function createPC(peerId){
   const pc=new RTCPeerConnection(ICE);
-  pc.onicecandidate=e=>{if(e.candidate)socket.emit('ice-candidate',{candidate:e.candidate,targetId:peerId});};
+
+  // Send ICE candidates through Ably
+  pc.onicecandidate=e=>{
+    if(e.candidate){
+      signal({type:'ice',to:peerId,candidate:e.candidate});
+    }
+  };
+
+  // Receive data channel (answerer side)
   pc.ondatachannel=e=>{
+    console.log('Got data channel from',peerId);
     S.peers[peerId].channel=e.channel;
     setupChannel(e.channel,peerId);
   };
+
   pc.onconnectionstatechange=()=>{
+    console.log('PC state with',peerId,':',pc.connectionState);
     if(pc.connectionState==='connected'){
       S.connected=true;
-      if(document.getElementById('app').style.display!=='block') bootApp();
-      addSys(`🔒 ${S.peers[peerId]?.avatar||'👤'} ${S.peers[peerId]?.name||'Peer'} connected · P2P direct`);
-      updateRoomHeader();updateMembersList();
+      const p=S.peers[peerId];
+      addSys(`✅ ${p?.avatar||'👤'} ${p?.name||'Peer'} connected · direct P2P`);
+      updateRoomHeader();
+      updateMembersList();
+      // Update room's last message
+      const r=S.rooms.find(x=>x.code===S.room);
+      if(r){r.lastMsg=`${p?.name} connected`;r.lastTime=ft(new Date());}
+      renderCL();
+    }
+    if(pc.connectionState==='failed'){
+      addSys(`⚠️ Connection to ${S.peers[peerId]?.name||'peer'} failed. Both should refresh.`);
     }
   };
+
   return pc;
 }
 
 function setupChannel(ch,peerId){
-  ch.onopen=()=>{console.log('Channel open with',peerId);};
+  ch.onopen=()=>{
+    console.log('✅ Data channel OPEN with',peerId);
+    S.connected=true;
+    updateRoomHeader();
+    updateMembersList();
+  };
+  ch.onclose=()=>console.log('Channel closed with',peerId);
+  ch.onerror=e=>console.error('Channel error:',e);
   ch.onmessage=e=>{
-    const d=JSON.parse(e.data);
-    const peer=S.peers[peerId];
-    if(d.type==='msg') receiveMsg({...d,senderName:peer?.name,senderAvatar:peer?.avatar});
-    else if(d.type==='typing') showTypingInd(d.isTyping,peer?.name);
+    try{
+      const d=JSON.parse(e.data);
+      const peer=S.peers[peerId];
+      if(d.type==='msg') receiveMsg({...d,senderName:peer?.name,senderAvatar:peer?.avatar});
+      else if(d.type==='typing') showTypingInd(d.isTyping);
+    }catch(err){console.error('Message parse error:',err);}
   };
 }
 
@@ -779,16 +891,20 @@ function setupChannel(ch,peerId){
 // BOOT APP
 // ══════════════════════════════════════════════
 function bootApp(){
+  if(appBooted) return;
+  appBooted=true;
   S.messages=[];
   document.getElementById('mav').textContent=S.avatar;
   document.getElementById('pab').textContent=S.avatar;
   document.getElementById('pnm').textContent=S.name;
   buildProfPanel();
-  S.rooms.unshift({code:S.room,lastMsg:'Connected',lastTime:ft(new Date()),unread:0,connected:true});
+  if(!S.rooms.find(r=>r.code===S.room)){
+    S.rooms.unshift({code:S.room,lastMsg:'Waiting for others...',lastTime:ft(new Date()),unread:0,connected:true});
+  }
   renderCL();
   show('app');
   document.getElementById('wlc').style.display='none';
-  const cw=document.getElementById('cwin');cw.style.display='flex';
+  document.getElementById('cwin').style.display='flex';
   updateRoomHeader();
   updateMembersList();
   applyTheme(S.theme);
@@ -799,44 +915,48 @@ function bootApp(){
 }
 
 function updateRoomHeader(){
-  const peerCount=Object.keys(S.peers).length;
-  document.getElementById('chav').textContent=peerCount===1?Object.values(S.peers)[0]?.avatar||'👥':'👥';
+  const cnt=Object.keys(S.peers).length;
+  document.getElementById('chav').textContent=cnt===1?Object.values(S.peers)[0]?.avatar||'👥':'👥';
   document.getElementById('chn').textContent=
-    peerCount===0?`Room ${S.room} · Waiting...`:
-    peerCount===1?`${Object.values(S.peers)[0]?.name} · ${S.room}`:
-    `Group · ${S.room} · ${peerCount+1} people`;
+    cnt===0?`Room ${S.room} · Waiting...`:
+    cnt===1?`${Object.values(S.peers)[0]?.name} · ${S.room}`:
+    `Group · ${S.room} · ${cnt+1} people`;
   document.getElementById('chs').textContent=
-    peerCount===0?'Waiting for people to join...':
-    `${peerCount} peer${peerCount>1?'s':''} connected · encrypted`;
-  document.getElementById('chs').className=peerCount===0?'chs off':'chs';
+    cnt===0?'Waiting for people to join — share the room code':
+    `${cnt} peer${cnt>1?'s':''} connected · P2P encrypted`;
+  document.getElementById('chs').className=cnt===0?'chs off':'chs';
 }
 
 function updateMembersList(){
   const list=document.getElementById('mbrs-list');
-  const count=Object.keys(S.peers).length+1;
-  document.getElementById('mbrs-title').textContent=`Members (${count})`;
-  document.getElementById('mbrs-btn').querySelector('svg').setAttribute('title',`${count} members`);
-  list.innerHTML=`<div class="mbr-item"><div class="mbr-av">${S.avatar}</div><div><div class="mbr-nm">${esc(S.name)}</div><div class="mbr-you">You</div></div></div>`
+  const cnt=Object.keys(S.peers).length+1;
+  document.getElementById('mbrs-title').textContent=`Members (${cnt})`;
+  list.innerHTML=
+    `<div class="mbr-item"><div class="mbr-av">${S.avatar}</div><div><div class="mbr-nm">${esc(S.name)}</div><div class="mbr-you">You</div></div></div>`
     +Object.values(S.peers).map(p=>`<div class="mbr-item"><div class="mbr-av">${p.avatar||'👤'}</div><div class="mbr-nm">${esc(p.name||'Peer')}</div></div>`).join('');
 }
 
-function toggleMembers(){
-  document.getElementById('mbrs-panel').classList.toggle('open');
-}
+function toggleMembers(){document.getElementById('mbrs-panel').classList.toggle('open');}
 
 // ══════════════════════════════════════════════
-// MESSAGING
+// MESSAGING — goes directly P2P via WebRTC
 // ══════════════════════════════════════════════
 function broadcast(data){
   const str=JSON.stringify(data);
   Object.values(S.peers).forEach(p=>{
-    if(p.channel&&p.channel.readyState==='open') p.channel.send(str);
+    if(p.channel&&p.channel.readyState==='open'){
+      try{p.channel.send(str);}catch(e){console.error('Send error:',e);}
+    }
   });
 }
 
 function sendMsg(){
   const txt=document.getElementById('mi').value.trim();
   if(!txt) return;
+  const connectedPeers=Object.values(S.peers).filter(p=>p.channel&&p.channel.readyState==='open');
+  if(connectedPeers.length===0){
+    toast('No one connected yet — share the room code!');return;
+  }
   document.getElementById('mi').value='';
   document.getElementById('mi').style.height='auto';
   document.getElementById('sbt').style.display='none';
@@ -846,6 +966,9 @@ function sendMsg(){
   broadcast(msg);
   addMsg({dir:'out',...msg});
   addRecent(txt);
+  const r=S.rooms.find(x=>x.code===S.room);
+  if(r){r.lastMsg=txt;r.lastTime=ft(now);}
+  renderCL();
 }
 
 function receiveMsg(data){
@@ -856,14 +979,9 @@ function receiveMsg(data){
   renderCL();
 }
 
-function addMsg(m){
-  S.messages.push(m);
-  renderMsgs();
-}
-
+function addMsg(m){S.messages.push(m);renderMsgs();}
 function addSys(t){S.messages.push({sys:true,text:t});renderMsgs();}
 
-// ── Typing indicator ──
 function sendTypingInd(){
   if(!S.connected) return;
   if(!S.isTyping){S.isTyping=true;broadcast({type:'typing',isTyping:true});}
@@ -871,30 +989,41 @@ function sendTypingInd(){
   S.typingTimer=setTimeout(()=>{S.isTyping=false;broadcast({type:'typing',isTyping:false});},1500);
 }
 
-function showTypingInd(v,name){
+function showTypingInd(v){
   document.getElementById('typ').classList.toggle('show',v);
-  const cbg=document.getElementById('cbg');
-  cbg.scrollTop=cbg.scrollHeight;
+  const bg=document.getElementById('cbg');
+  bg.scrollTop=bg.scrollHeight;
 }
 
-// ── Render messages ──
+// ══════════════════════════════════════════════
+// RENDER MESSAGES
+// ══════════════════════════════════════════════
 function renderMsgs(){
   const bg=document.getElementById('cbg');
   const typ=document.getElementById('typ');
   bg.innerHTML='';bg.appendChild(typ);
   let ld='';
   S.messages.forEach(m=>{
-    if(m.sys){const d=document.createElement('div');d.className='sys fin';d.textContent=m.text;bg.insertBefore(d,typ);return;}
-    if(m.date&&m.date!==ld){ld=m.date;const dd=document.createElement('div');dd.className='dv fin';dd.innerHTML=`<span>${m.date}</span>`;bg.insertBefore(dd,typ);}
-    const row=document.createElement('div');row.className=`mr ${m.dir} fin`;
+    if(m.sys){
+      const d=document.createElement('div');
+      d.className='sys fin';d.textContent=m.text;
+      bg.insertBefore(d,typ);return;
+    }
+    if(m.date&&m.date!==ld){
+      ld=m.date;
+      const dd=document.createElement('div');
+      dd.className='dv fin';dd.innerHTML=`<span>${m.date}</span>`;
+      bg.insertBefore(dd,typ);
+    }
+    const row=document.createElement('div');
+    row.className=`mr ${m.dir} fin`;
+    const senderLabel=(m.dir==='in'&&Object.keys(S.peers).length>1)?`<div class="bsn">${esc(m.senderName||'Peer')}</div>`:'';
     let inner='';
-    // Show sender name in group if incoming
-    const senderLabel=(m.dir==='in'&&(Object.keys(S.peers).length>1))?`<div class="bsn">${esc(m.senderName||'Peer')}</div>`:'';
-    if(m.msgType==='text') inner=`${senderLabel}<div class="btx">${esc(m.text)}</div>`;
+    if(m.msgType==='text'||!m.msgType) inner=`${senderLabel}<div class="btx">${esc(m.text)}</div>`;
     else if(m.msgType==='image') inner=`${senderLabel}<img class="img-bbl" src="${m.data}" onclick="openLbox('img','${m.data}')"/>`;
-    else if(m.msgType==='video') inner=`${senderLabel}<video class="vid-bbl" src="${m.data}" controls onclick="event.stopPropagation()"></video>`;
+    else if(m.msgType==='video') inner=`${senderLabel}<video class="vid-bbl" src="${m.data}" controls></video>`;
     else if(m.msgType==='audio') inner=buildAudioBubble(m);
-    else if(m.msgType==='document') inner=`${senderLabel}<div class="doc-bbl" onclick="downloadFile('${m.data}','${m.fileName}')"><div class="doc-ico">📄</div><div class="doc-info"><div class="doc-name">${esc(m.fileName||'Document')}</div><div class="doc-size">${m.fileSize||''} · Tap to download</div></div></div>`;
+    else if(m.msgType==='document'||m.msgType==='file') inner=`${senderLabel}<div class="doc-bbl" onclick="downloadFile('${m.data}','${m.fileName}')"><div class="doc-ico">📄</div><div class="doc-info"><div class="doc-name">${esc(m.fileName||'File')}</div><div class="doc-size">${m.fileSize||''} · Tap to download</div></div></div>`;
     else if(m.msgType==='location') inner=buildLocationBubble(m);
     else inner=`${senderLabel}<div class="btx">${esc(m.text||'[file]')}</div>`;
 
@@ -905,87 +1034,61 @@ function renderMsgs(){
 }
 
 function buildAudioBubble(m){
-  const id='aud_'+Date.now();
-  setTimeout(()=>{
-    const el=document.getElementById(id);
-    if(el) el.src=m.data;
-  },50);
-  const bars=Array.from({length:25},(_,i)=>{
-    const h=8+Math.floor(Math.random()*18);
-    return `<div class="aud-bar" style="height:${h}px;"></div>`;
-  }).join('');
+  const id='a'+Date.now()+Math.random().toString(36).slice(2,5);
+  const bars=Array.from({length:25},()=>`<div class="aud-bar" style="height:${8+~~(Math.random()*18)}px"></div>`).join('');
+  setTimeout(()=>{const el=document.getElementById(id);if(el)el.src=m.data;},50);
   return `<div class="aud-bbl">
-    <button class="aud-play" onclick="toggleAudio('${id}',this)"><svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg></button>
+    <button class="aud-play" onclick="toggleAudio('${id}',this)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg></button>
     <div class="aud-wave">${bars}</div>
     <span class="aud-dur">${m.duration||'0:00'}</span>
-    <audio id="${id}" src="${m.data}" onended="resetAudioBtn('${id}')"></audio>
+    <audio id="${id}" onended="resetAudioBtn(this)"></audio>
   </div>`;
 }
-
 function toggleAudio(id,btn){
-  const aud=document.getElementById(id);
-  if(!aud) return;
-  if(aud.paused){aud.play();btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';}
-  else{aud.pause();btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>';}
+  const a=document.getElementById(id);if(!a)return;
+  if(a.paused){a.play();btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';}
+  else{a.pause();btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>';}
 }
-function resetAudioBtn(id){
-  const btn=document.querySelector(`[onclick="toggleAudio('${id}',this)"]`);
-  if(btn) btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>';
+function resetAudioBtn(a){
+  const btn=a.previousElementSibling?.previousElementSibling;
+  if(btn) btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>';
 }
-
 function buildLocationBubble(m){
-  const mapUrl=`https://maps.googleapis.com/maps/api/staticmap?center=${m.lat},${m.lng}&zoom=14&size=280x120&markers=color:red%7C${m.lat},${m.lng}&key=YOUR_KEY`;
-  const mapsLink=`https://www.google.com/maps?q=${m.lat},${m.lng}`;
-  return `<div class="loc-bbl" onclick="window.open('${mapsLink}','_blank')">
+  const link=`https://www.google.com/maps?q=${m.lat},${m.lng}`;
+  return `<div class="loc-bbl" onclick="window.open('${link}','_blank')">
     <div class="loc-map">📍</div>
-    <div class="btx" style="font-weight:600;">📍 Location</div>
-    <div class="loc-addr">${m.address||`${m.lat?.toFixed(4)}, ${m.lng?.toFixed(4)}`}</div>
+    <div class="btx" style="font-weight:600">📍 Location shared</div>
+    <div class="loc-addr">${m.address||`${m.lat?.toFixed(5)}, ${m.lng?.toFixed(5)}`} · Tap to open</div>
   </div>`;
 }
 
 // ══════════════════════════════════════════════
-// FILE / MEDIA UPLOAD
+// FILE UPLOAD
 // ══════════════════════════════════════════════
-function triggerFile(type){
-  document.getElementById('fi-'+type).click();
-  document.getElementById('attmenu').classList.remove('open');
-}
-
+function triggerFile(t){document.getElementById('fi-'+t).click();document.getElementById('attmenu').classList.remove('open');}
 function handleFile(file,type){
-  if(!file) return;
-  if(file.size>50*1024*1024){toast('File too large (max 50MB)');return;}
+  if(!file)return;
+  if(file.size>25*1024*1024){toast('File too large (max 25MB for P2P)');return;}
   const reader=new FileReader();
   reader.onload=e=>{
     const now=new Date();
     let msgType=type;
     if(type==='file') msgType=getFileType(file.name);
-    const msg={type:'msg',msgType,data:e.target.result,fileName:file.name,
-      fileSize:fmtSize(file.size),time:ft(now),date:fd(now)};
-    broadcast(msg);
-    addMsg({dir:'out',...msg});
+    const msg={type:'msg',msgType,data:e.target.result,fileName:file.name,fileSize:fmtSize(file.size),time:ft(now),date:fd(now)};
+    broadcast(msg);addMsg({dir:'out',...msg});
   };
   reader.readAsDataURL(file);
 }
-
-function getFileType(name){
-  const ext=name.split('.').pop().toLowerCase();
-  if(['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image';
-  if(['mp4','webm','mov','avi'].includes(ext)) return 'video';
-  if(['mp3','wav','ogg','m4a'].includes(ext)) return 'audio';
+function getFileType(n){
+  const e=n.split('.').pop().toLowerCase();
+  if(['jpg','jpeg','png','gif','webp'].includes(e)) return 'image';
+  if(['mp4','webm','mov'].includes(e)) return 'video';
+  if(['mp3','wav','ogg','m4a'].includes(e)) return 'audio';
   return 'document';
 }
+function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+function downloadFile(data,name){const a=document.createElement('a');a.href=data;a.download=name||'file';a.click();}
 
-function fmtSize(b){
-  if(b<1024) return b+'B';
-  if(b<1024*1024) return (b/1024).toFixed(1)+'KB';
-  return (b/(1024*1024)).toFixed(1)+'MB';
-}
-
-function downloadFile(data,name){
-  const a=document.createElement('a');a.href=data;a.download=name||'file';a.click();
-}
-
-// ── Location ──
 function shareLocation(){
   document.getElementById('attmenu').classList.remove('open');
   if(!navigator.geolocation){toast('Geolocation not supported');return;}
@@ -993,22 +1096,19 @@ function shareLocation(){
   navigator.geolocation.getCurrentPosition(pos=>{
     const now=new Date();
     const msg={type:'msg',msgType:'location',lat:pos.coords.latitude,lng:pos.coords.longitude,
-      address:`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`,
-      time:ft(now),date:fd(now)};
-    broadcast(msg);
-    addMsg({dir:'out',...msg});
-  },err=>{toast('Could not get location: '+err.message);});
+      address:`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`,time:ft(now),date:fd(now)};
+    broadcast(msg);addMsg({dir:'out',...msg});
+  },err=>{toast('Location error: '+err.message);});
 }
 
-// ── Voice recording ──
-function toggleVoice(){
-  if(!S.isRecording) startVoice(); else stopVoice();
-}
-
+// ══════════════════════════════════════════════
+// VOICE RECORDING
+// ══════════════════════════════════════════════
+function toggleVoice(){if(!S.isRecording)startVoice();else stopVoice();}
 async function startVoice(){
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    S.audioChunks=[];
+    S.audioChunks=[];S.recSeconds=0;
     S.mediaRecorder=new MediaRecorder(stream);
     S.mediaRecorder.ondataavailable=e=>S.audioChunks.push(e.data);
     S.mediaRecorder.onstop=()=>{
@@ -1016,114 +1116,84 @@ async function startVoice(){
       const reader=new FileReader();
       reader.onload=e=>{
         const now=new Date();
-        const msg={type:'msg',msgType:'audio',data:e.target.result,
-          duration:formatDuration(S.recSeconds||0),time:ft(now),date:fd(now)};
+        const msg={type:'msg',msgType:'audio',data:e.target.result,duration:fmtDur(S.recSeconds||0),time:ft(now),date:fd(now)};
         broadcast(msg);addMsg({dir:'out',...msg});
       };
       reader.readAsDataURL(blob);
       stream.getTracks().forEach(t=>t.stop());
     };
-    S.mediaRecorder.start();
-    S.isRecording=true;
-    S.recSeconds=0;
+    S.mediaRecorder.start();S.isRecording=true;
     S.recInterval=setInterval(()=>S.recSeconds++,1000);
     const btn=document.getElementById('vcbt');
     btn.classList.add('recording');
-    btn.title='Tap to stop recording';
     btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
     document.getElementById('attmenu').classList.remove('open');
-    toast('🔴 Recording... Tap mic to stop');
+    toast('🔴 Recording... tap mic to stop');
   }catch(e){toast('Microphone access denied');}
 }
-
 function stopVoice(){
-  if(S.mediaRecorder&&S.mediaRecorder.state!=='inactive') S.mediaRecorder.stop();
-  clearInterval(S.recInterval);
-  S.isRecording=false;
+  if(S.mediaRecorder&&S.mediaRecorder.state!=='inactive')S.mediaRecorder.stop();
+  clearInterval(S.recInterval);S.isRecording=false;
   const btn=document.getElementById('vcbt');
   btn.classList.remove('recording');
-  btn.title='Hold to record';
   btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
 }
-
-function formatDuration(s){return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;}
+function fmtDur(s){return`${~~(s/60)}:${(s%60).toString().padStart(2,'0')}`;}
 
 // ══════════════════════════════════════════════
 // EMOJI KEYBOARD
 // ══════════════════════════════════════════════
-let currentEkCat=0;
+let ekCat=0;
 function buildEmojiKB(){
-  const tabs=document.getElementById('ektabs');
-  const grid=document.getElementById('ekgrid');
-  tabs.innerHTML=EMOJI_CATS.map((c,i)=>
+  document.getElementById('ektabs').innerHTML=EMOJI_CATS.map((c,i)=>
     `<div class="ekt${i===0?' active':''}" onclick="switchEkCat(${i})">${c.icon}</div>`).join('');
   renderEkCat(0);
 }
-
-function renderEkCat(idx){
-  const grid=document.getElementById('ekgrid');
-  const cat=EMOJI_CATS[idx];
-  const emojis=idx===EMOJI_CATS.length-1?S.recentEmojis:cat.emojis;
-  grid.innerHTML=emojis.map(e=>`<div class="eq" onclick="insEmoji('${e}')">${e}</div>`).join('');
+function renderEkCat(i){
+  const emojis=i===EMOJI_CATS.length-1?S.recentEmojis:EMOJI_CATS[i].emojis;
+  document.getElementById('ekgrid').innerHTML=emojis.map(e=>`<div class="eq" onclick="insEmoji('${e}')">${e}</div>`).join('');
 }
-
-function switchEkCat(idx){
-  currentEkCat=idx;
-  document.querySelectorAll('.ekt').forEach((t,i)=>t.classList.toggle('active',i===idx));
-  renderEkCat(idx);
+function switchEkCat(i){
+  ekCat=i;
+  document.querySelectorAll('.ekt').forEach((t,j)=>t.classList.toggle('active',j===i));
+  renderEkCat(i);
 }
-
-function toggleEkb(){
-  const ekb=document.getElementById('ekb');
-  ekb.classList.toggle('open');
-  document.getElementById('attmenu').classList.remove('open');
-}
-
+function toggleEkb(){document.getElementById('ekb').classList.toggle('open');document.getElementById('attmenu').classList.remove('open');}
 function insEmoji(e){
-  const inp=document.getElementById('mi');
-  inp.value+=e;inp.focus();
-  addRecent(e);
-  // Show send button
+  const inp=document.getElementById('mi');inp.value+=e;inp.focus();
   document.getElementById('sbt').style.display='flex';
   document.getElementById('vcbt').style.display='none';
+  addRecent(e);
 }
-
 function addRecent(e){
-  if(e.length<=2){// likely an emoji
+  if([...e].length<=2){
     S.recentEmojis=S.recentEmojis.filter(x=>x!==e);
     S.recentEmojis.unshift(e);
-    if(S.recentEmojis.length>40) S.recentEmojis.pop();
-    if(currentEkCat===EMOJI_CATS.length-1) renderEkCat(currentEkCat);
+    if(S.recentEmojis.length>40)S.recentEmojis.pop();
+    if(ekCat===EMOJI_CATS.length-1)renderEkCat(ekCat);
   }
 }
 
 // ══════════════════════════════════════════════
-// ATTACH MENU
+// ATTACH
 // ══════════════════════════════════════════════
-function toggleAtt(){
-  document.getElementById('attmenu').classList.toggle('open');
-  document.getElementById('ekb').classList.remove('open');
-}
+function toggleAtt(){document.getElementById('attmenu').classList.toggle('open');document.getElementById('ekb').classList.remove('open');}
 
 // ══════════════════════════════════════════════
 // LIGHTBOX
 // ══════════════════════════════════════════════
 function openLbox(type,src){
-  const lbox=document.getElementById('lbox');
   const c=document.getElementById('lbox-content');
   c.innerHTML=type==='img'?`<img src="${src}"/>`:`<video src="${src}" controls autoplay></video>`;
-  lbox.classList.add('open');
+  document.getElementById('lbox').classList.add('open');
 }
-function closeLbox(){
-  document.getElementById('lbox').classList.remove('open');
-  document.getElementById('lbox-content').innerHTML='';
-}
+function closeLbox(){document.getElementById('lbox').classList.remove('open');document.getElementById('lbox-content').innerHTML='';}
 
 // ══════════════════════════════════════════════
 // LEAVE / DISCONNECT
 // ══════════════════════════════════════════════
 function leaveRoom(){
-  if(!confirm('Leave room? All messages permanently deleted.')) return;
+  if(!confirm('Leave room? All messages permanently deleted.'))return;
   disconnectAll();
   S.messages=[];
   S.rooms=S.rooms.filter(r=>r.code!==S.room);
@@ -1131,14 +1201,19 @@ function leaveRoom(){
   document.getElementById('wlc').style.display='flex';
   renderCL();
 }
-
 function cancelConn(){disconnectAll();show('home');}
-
 function disconnectAll(){
-  if(socket){socket.emit('leave-room');socket.disconnect();socket=null;}
+  appBooted=false;
+  // Tell others we left
+  if(sigChannel){
+    try{sigChannel.publish('signal',{type:'leave',from:S.myId,name:S.name,avatar:S.avatar});}catch(e){}
+    try{sigChannel.unsubscribe();}catch(e){}
+    sigChannel=null;
+  }
+  if(ablyClient){try{ablyClient.close();}catch(e){}ablyClient=null;}
   Object.values(S.peers).forEach(p=>{
-    if(p.channel) try{p.channel.close();}catch(e){}
-    if(p.conn) try{p.conn.close();}catch(e){}
+    if(p.channel)try{p.channel.close();}catch(e){}
+    if(p.conn)try{p.conn.close();}catch(e){}
   });
   S.peers={};S.connected=false;
 }
@@ -1186,10 +1261,12 @@ function applyTheme(id){
 function hk(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}}
 function ar(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
 function ft(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
-function fd(d){const t=new Date(),y=new Date(t);y.setDate(t.getDate()-1);
+function fd(d){
+  const t=new Date(),y=new Date(t);y.setDate(t.getDate()-1);
   if(d.toDateString()===t.toDateString())return'Today';
   if(d.toDateString()===y.toDateString())return'Yesterday';
-  return d.toLocaleDateString([],{month:'short',day:'numeric'});}
+  return d.toLocaleDateString([],{month:'short',day:'numeric'});
+}
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function toast(msg){const t=document.getElementById('toastEl');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 </script>
